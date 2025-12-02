@@ -1,102 +1,60 @@
-# Factory Ops Hack
+# Intelligent Predictive Maintenance Hackathon
 
-Welcome to the Factory Ops Hack! This repository contains a series of challenges designed to test and improve your skills in factory operations, automation, and systems optimization.
+Welcome to the Intelligent Predictive Maintenance Hackathon! 🏭 Today, you'll dive into the world of intelligent agent systems powered by Azure AI to revolutionize equipment maintenance in tire manufacturing. Get ready for a hands-on, high-impact day of learning and innovation!
 
-## Overview
+## Introduction
 
-This hackathon focuses on solving real-world factory operational challenges through code. Each challenge builds upon practical scenarios that factory operators and engineers face daily.
+Get ready to transform maintenance with AI using the revolutionary **Microsoft Agent Framework**! In this hackathon, you'll master the latest enterprise-grade agent technology to build intelligent maintenance systems that detect anomalies, diagnose faults, and schedule repairs—just like real maintenance teams, but faster and more accurate.
 
-## Structure
+Using sequential orchestration and Azure AI integration, your specialized agents will collaborate seamlessly to automate complex maintenance workflows in tire manufacturing. From telemetry monitoring through root cause analysis to work order creation and technician scheduling, you'll create a multi-agent system with comprehensive observability that redefines how factories prevent downtime and optimize operations.
 
-The repository is organized into individual challenge folders:
+## Learning Objectives 🎯
 
-```
-challenges/
-├── challenge-01/
-├── challenge-02/
-├── challenge-03/
-├── challenge-04/
-├── challenge-05/
-└── challenge-06/
-```
+By participating in this hackathon, you will learn how to:
 
-Each challenge folder contains:
-- `README.md` - Challenge description and requirements
-- `starter/` - Starter code and templates
-- `solution/` - Reference solution (hidden until completion)
-- `tests/` - Test cases to validate your solution
+- **Master Microsoft Agent Framework** using the enterprise-grade SDK for building, orchestrating, and deploying sophisticated AI agents with sequential workflows and multi-agent systems
+- **Build Specialized Maintenance Agents** (Anomaly Detection, Fault Diagnosis, Repair Planner, Scheduler) with advanced prompt engineering, tool integration, and persistent memory capabilities
+- **Implement RAG Patterns** using Azure Cognitive Search for knowledge retrieval and intelligent root cause analysis
+- **Deploy Sequential Orchestration** leveraging Agent Framework workflows to coordinate specialized agents into cohesive maintenance pipelines
+- **Apply Enterprise Observability** using OpenTelemetry monitoring, Azure AI Foundry tracking, and comprehensive system observability for production-ready agent systems
 
-## Getting Started
+## Architecture
 
-1. Clone this repository
-2. Navigate to a challenge folder
-3. Read the challenge README
-4. Implement your solution
-5. Run the tests to verify your work
+In this hackathon we will leverage the **Microsoft Agent Framework** to create a sophisticated, enterprise-ready predictive maintenance solution. The architecture follows a 4-agent sequential pattern:
+
+- **Anomaly Detection Agent:** Monitors IoT telemetry and detects abnormal equipment behavior using threshold-based logic from Azure Cosmos DB
+- **Fault Diagnosis Agent:** Performs root cause analysis using RAG pattern with Azure Cognitive Search and Azure AI Foundry agents for intelligent diagnostics
+- **Repair Planner Agent:** Creates work orders and validates resource availability (parts, technicians, schedule) using Azure AI Foundry agents and multi-container Cosmos DB queries
+- **Maintenance Scheduler Agent:** Coordinates logistics, books technicians, and manages execution using Azure AI Foundry agents and optional Calendar API integration
+
+The workflow follows the principle of **"right tool for the right job"** - using Azure AI Foundry agents for conversational AI capabilities and sequential orchestration. This ensures continuous monitoring, rapid response to anomalies, and comprehensive maintenance planning with full observability.
+
+![Architecture](./images/architecture.png)
+
+
 
 ## Challenges
 
-- **Challenge 01: Line Flow Balancing** - Build an agent that balances workload across production stations in real-time, maintaining takt time and detecting bottlenecks.
+- **Challenge 00**: **[Environment Setup & Data Foundation](challenge-0/README.md)** : Set up your development environment, deploy Azure resources, configure environment variables, and seed sample factory data with 5 machines including pre-seeded warning conditions
+- **Challenge 01**: **[Anomaly Detection Agent](challenge-1/README.md)**: Build an agent that monitors IoT telemetry from tire manufacturing equipment, compares readings against thresholds, and detects anomalies using threshold-based logic
+- **Challenge 02**: **[Fault Diagnosis Agent](challenge-2/README.md)**: Build an agent that performs root cause analysis using RAG pattern with Azure Cognitive Search and GPT models, querying knowledge base articles and historical repairs
+- **Challenge 03**: **[Repair Planner Agent](challenge-3/README.md)**: Build an agent that creates work orders and validates resource availability across multiple systems (parts inventory, technicians, production schedule)
+- **Challenge 04**: **[Multi-Agent Orchestration](challenge-4/README.md)**: Build the Scheduler agent and orchestrate all 4 agents into a sequential workflow using Microsoft Agent Framework with comprehensive observability
 
-- **Challenge 02: Materials Kitting & Just-in-Time Delivery** - Create an agent that prepares parts kits, handles substitutions, and coordinates AGV deliveries to the production line.
 
-- **Challenge 03: Changeover & Setup Optimization** - Develop an agent that schedules equipment changeovers optimally, minimizing downtime while ensuring tools and operators are ready.
 
-- **Challenge 04: Energy Pacing & Utilities Management** - Design an agent that optimizes energy consumption by shifting loads to off-peak hours while maintaining production targets.
+## Requirements
 
-- **Challenge 05: Multi-Agent Orchestration & Exception Recovery** - Build the master orchestrator that coordinates all specialist agents and handles factory-wide exceptions with human-in-the-loop approval.
+To successfully complete this hackathon, you will need the following:
 
-- **Challenge 06: Governance, Observability & Compliance** - Implement the monitoring, tracing, evaluation, and compliance layer that ensures all agents operate safely, efficiently, and within regulatory boundaries.
+- GitHub account to access the repository and run GitHub Codespaces and Github Copilot
+- Be familiar with Python programming, including handling JSON data and making API calls
+- Be familiar with Generative AI Solutions and Azure Services
+- An active Azure subscription, with Owner rights
+- Ability to provision resources in **Sweden Central** or [another supported region](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#global-standard-model-availability)
 
-## Work in Progress
 
-### Technical Architecture Gaps
-
-The following elements from the target architecture need to be integrated into the challenges:
-
-#### 1. Platform & Infrastructure
-- **Foundry Agent Service**: All agents should be built on this platform
-- **Azure MCP Integration**: Each agent requires Azure Model Context Protocol setup
-- **AI Models**: Specific model assignments per agent:
-  - Line Flow Orchestrator: Phi-4
-  - Changeover & Setup Planner: GPT5
-  - Materials Kitting & Delivery: o3
-  - Energy Pacing & Utilities: o3-mini
-  - Exception & Recovery: Grok 4
-
-#### 2. Agent Capabilities
-- **Memory Component**: Each agent needs state persistence and learning capabilities
-- **Recovery Playbooks**: Exception handling should use reusable playbook patterns (not ad-hoc responses)
-
-#### 3. Data Systems Integration
-Make explicit connections to factory systems:
-- **MES (Manufacturing Execution System)**: Orders, routing, yields
-- **APS/WFM**: Machine states and advanced planning
-- **IoT Sensors**: Energy usage and real-time monitoring
-- **WMS/AGF**: Warehouse management and AGV fleet coordination
-- **Supplier Data**: External supply chain feeds
-
-#### 4. Governance & Observability Layer
-Missing operational capabilities that should be added:
-- **App Insights**: Application performance monitoring
-- **Tracing & Monitoring**: End-to-end agent execution tracking
-- **Evaluations**: Agent performance assessment and benchmarking
-- **Safety & Compliance**: Regulatory and safety constraint enforcement
-- **Identity Management**: Security and access control
-
-#### 5. Potential Additional Challenges
-- **Challenge 00 (Foundation)**: Set up Azure MCP, Foundry Agent Service, and integrate with MES/IoT data sources
-
-### Next Steps
-- Update individual challenge READMEs with technical requirements
-- Create starter templates for Foundry Agent Service
-- Add data integration specifications
-- Develop governance and monitoring guidelines
 
 ## Contributing
 
-Please read the contribution guidelines before submitting pull requests.
-
-## License
-
-See LICENSE file for details.
+We welcome contributions! Please see the [Contributing Guide](CONTRIBUTING.md) for details on coding standards, development environment setup and submission processes.
