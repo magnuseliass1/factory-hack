@@ -1,0 +1,4 @@
+azure-identity
+agent-framework-core
+agent-framework-azure-ai
+azure-ai-projects
