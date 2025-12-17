@@ -99,6 +99,7 @@ async def main():
                     ],
                     store=True
                 )
+                print(f"✅ Created Fault Diagnosis Agent: {agent.id}")
                # Test the agent with a simple query
                 print("\n🧪 Testing the agent with a sample query...")
                 try:
