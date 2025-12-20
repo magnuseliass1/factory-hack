@@ -164,5 +164,129 @@ namespace PredictiveMaintenanceAgent.Services
             await container.DeleteItemAsync<WorkOrder>(workOrderId, new PartitionKey(oldStatus));
             await container.CreateItemAsync(workOrder, new PartitionKey(status));
         }
+
+        /// <summary>
+        /// Get thread ID for a machine from persistent storage
+        /// </summary>
+        public async Task<string?> GetMachineThreadIdAsync(string machineId)
+        {
+            try
+            {
+                var containerResponse = await _database.CreateContainerIfNotExistsAsync(
+                    "ThreadMappings",
+                    "/entityId"
+                );
+                
+                var response = await containerResponse.Container.ReadItemAsync<ThreadMapping>(
+                    machineId,
+                    new PartitionKey(machineId)
+                );
+                
+                return response.Resource.ThreadId;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Save thread ID for a machine to persistent storage
+        /// </summary>
+        public async Task SaveMachineThreadIdAsync(string machineId, string threadId)
+        {
+            var containerResponse = await _database.CreateContainerIfNotExistsAsync(
+                "ThreadMappings",
+                "/entityId"
+            );
+            
+            var mapping = new ThreadMapping
+            {
+                Id = machineId,
+                EntityId = machineId,
+                EntityType = "machine",
+                ThreadId = threadId,
+                Purpose = "predictive_maintenance",
+                CreatedAt = DateTime.UtcNow,
+                LastAccessedAt = DateTime.UtcNow
+            };
+            
+            await containerResponse.Container.UpsertItemAsync(mapping, new PartitionKey(machineId));
+        }
+
+        /// <summary>
+        /// Get chat history for a machine from persistent storage
+        /// </summary>
+        public async Task<string?> GetMachineChatHistoryAsync(string machineId)
+        {
+            try
+            {
+                var containerResponse = await _database.CreateContainerIfNotExistsAsync(
+                    "ChatHistories",
+                    "/entityId"
+                );
+                
+                var response = await containerResponse.Container.ReadItemAsync<ChatHistory>(
+                    machineId,
+                    new PartitionKey(machineId)
+                );
+                
+                return response.Resource.HistoryJson;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Save chat history for a machine to persistent storage
+        /// </summary>
+        public async Task SaveMachineChatHistoryAsync(string machineId, string historyJson)
+        {
+            var containerResponse = await _database.CreateContainerIfNotExistsAsync(
+                "ChatHistories",
+                "/entityId"
+            );
+            
+            var history = new ChatHistory
+            {
+                Id = machineId,
+                EntityId = machineId,
+                EntityType = "machine",
+                HistoryJson = historyJson,
+                Purpose = "predictive_maintenance",
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            await containerResponse.Container.UpsertItemAsync(history, new PartitionKey(machineId));
+        }
+    }
+
+    /// <summary>
+    /// Thread mapping model for storing agent conversation threads
+    /// </summary>
+    public class ThreadMapping
+    {
+        public string Id { get; set; } = string.Empty;
+        public string EntityId { get; set; } = string.Empty;
+        public string EntityType { get; set; } = string.Empty;
+        public string ThreadId { get; set; } = string.Empty;
+        public string Purpose { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime LastAccessedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Chat history model for storing conversation history
+    /// </summary>
+    public class ChatHistory
+    {
+        public string Id { get; set; } = string.Empty;
+        public string EntityId { get; set; } = string.Empty;
+        public string EntityType { get; set; } = string.Empty;
+        public string HistoryJson { get; set; } = string.Empty;
+        public string Purpose { get; set; } = string.Empty;
+        public DateTime UpdatedAt { get; set; }
     }
 }

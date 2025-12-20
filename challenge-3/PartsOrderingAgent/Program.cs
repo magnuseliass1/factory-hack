@@ -6,7 +6,8 @@ namespace PartsOrderingAgent
 {
     class Program
     {
-        static async Task Main(string[] args)
+        // static async Task Main(string[] args)
+        static async Task MainProgram(string[] args)
         {
             Console.WriteLine("=== Parts Ordering Agent ===\n");
 
@@ -34,7 +35,7 @@ namespace PartsOrderingAgent
 
             // Initialize services
             var cosmosService = new CosmosDbService(cosmosEndpoint, cosmosKey, databaseName);
-            var agentService = new PartsOrderingAgentService(aiConnectionString, partsOrderingAgentId);
+            var agentService = new PartsOrderingAgentService(aiConnectionString, partsOrderingAgentId, cosmosService);
 
             // Get work order ID from command line or use default
             Console.WriteLine("1. Retrieving work order...");

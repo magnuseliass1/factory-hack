@@ -1,9 +1,9 @@
-using Azure.AI.Projects;
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using SharedModels;
 using Newtonsoft.Json;
 using System.Text;
-using Azure.AI.Agents.Persistent;
+using OpenAI.Chat;
 
 namespace PartsOrderingAgent.Services
 {
@@ -11,16 +11,18 @@ namespace PartsOrderingAgent.Services
     {
         private readonly string _projectEndpoint;
         private readonly string _agentId;
+        private readonly CosmosDbService _cosmosService;
 
-        public PartsOrderingAgentService(string projectEndpoint, string agentId)
+        public PartsOrderingAgentService(string projectEndpoint, string agentId, CosmosDbService cosmosService)
         {
             _projectEndpoint = projectEndpoint;
             _agentId = agentId;
+            _cosmosService = cosmosService;
         }
 
         /// <summary>
-        /// Generate optimized parts order using AI
-        /// Note: Persistent agents inherently support memory through thread-based conversations
+        /// Generate optimized parts order using AI with persistent memory
+        /// Each work order gets its own conversation thread for supplier performance tracking
         /// </summary>
         public async Task<PartsOrder> GeneratePartsOrderAsync(
             WorkOrder workOrder,
@@ -30,48 +32,152 @@ namespace PartsOrderingAgent.Services
             // Build context for the AI agent
             var context = BuildOrderingContext(workOrder, inventory, suppliers);
 
-            // Use AIProjectClient for running the agent
-            var projectClient = new AIProjectClient(new Uri(_projectEndpoint), new DefaultAzureCredential());
-            var persistentClient = new PersistentAgentsClient(_projectEndpoint, new DefaultAzureCredential());
-            
-            // Get the agent
-            var agentResponse = await persistentClient.Administration.GetAgentAsync(_agentId);
-            
-            // For now, use a simple run without explicit thread management
-            // In production, you would create and reuse threads for conversation memory
-            
-            // TODO: Implement actual agent invocation with Azure.AI.Agents.Persistent SDK
-            // For now using a placeholder response that selects the best supplier
-            var selectedSupplier = suppliers
-                .Where(s => s.Reliability == "High")
-                .OrderBy(s => s.LeadTimeDays)
-                .FirstOrDefault() ?? suppliers.First();
+            // Get or create chat history for this work order
+            var chatHistory = await GetOrCreateWorkOrderChatHistoryAsync(workOrder.Id);
+            Console.WriteLine($"   Using chat history with {chatHistory.Count} messages for work order: {workOrder.Id}");
 
-            var orderItems = workOrder.RequiredParts
-                .Where(part => !part.IsAvailable)
-                .Select(part => new OrderItem
-                {
-                    PartNumber = part.PartNumber,
-                    PartName = part.PartName,
-                    Quantity = part.Quantity,
-                    UnitCost = 100.00m, // Placeholder
-                    TotalCost = 100.00m * part.Quantity
-                }).ToList();
+            // Create agent client
+            var endpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") ?? throw new Exception("AZURE_OPENAI_ENDPOINT not set"));
+            var deploymentName = Environment.GetEnvironmentVariable("AZURE_FOUNDRY_PROJECT_DEPLOYMENT_NAME") ?? "gpt-4o";
+            
+            var client = new AzureOpenAIClient(endpoint, new DefaultAzureCredential());
+            var chatClient = client.GetChatClient(deploymentName);
+
+            // Agent instructions
+            var instructions = @"You are a parts ordering specialist for industrial tire manufacturing equipment. Your role is to analyze inventory status and optimize parts ordering from suppliers.
+
+When processing parts orders:
+1. Review current inventory levels for required parts
+2. Check against minimum stock and reorder points
+3. Identify suppliers for needed parts considering:
+   - Supplier reliability and delivery performance
+   - Lead time (prefer shorter)
+   - Cost (balance with reliability)
+   - Previous order history
+4. Determine order urgency based on current stock vs. reorder point
+5. Calculate expected delivery dates
+
+Always respond in valid JSON format as requested.";
+
+            // Build complete message list: system + history + new request
+            var messages = new List<ChatMessage>
+            {
+                new SystemChatMessage(instructions)
+            };
+            
+            // Add chat history (previous conversations for this work order)
+            messages.AddRange(chatHistory);
+            
+            // Add current request
+            messages.Add(new UserChatMessage(context));
+
+            // Call the model
+            var completion = await chatClient.CompleteChatAsync(messages);
+            var responseText = completion.Value.Content[0].Text;
+
+            // Store the conversation in chat history
+            chatHistory.Add(new UserChatMessage(context));
+            chatHistory.Add(new AssistantChatMessage(responseText));
+            await SaveWorkOrderChatHistoryAsync(workOrder.Id, chatHistory);
+
+            var jsonResponse = ExtractJsonFromResponse(responseText);
+            
+            // Parse the agent's ordering decision
+            dynamic orderData = JsonConvert.DeserializeObject(jsonResponse) 
+                ?? throw new Exception("Failed to parse order data from agent response");
 
             var order = new PartsOrder
             {
                 Id = $"PO-{Guid.NewGuid().ToString().Substring(0, 8)}",
                 WorkOrderId = workOrder.Id,
-                OrderItems = orderItems,
-                SupplierId = selectedSupplier.Id,
-                SupplierName = selectedSupplier.Name,
-                TotalCost = orderItems.Sum(i => i.TotalCost),
-                ExpectedDeliveryDate = DateTime.UtcNow.AddDays(selectedSupplier.LeadTimeDays),
+                OrderItems = ((IEnumerable<dynamic>)orderData.orderItems).Select(item => new OrderItem
+                {
+                    PartNumber = (string)item.partNumber,
+                    PartName = (string)item.partName,
+                    Quantity = (int)item.quantity,
+                    UnitCost = (decimal)item.unitCost,
+                    TotalCost = (decimal)item.totalCost
+                }).ToList(),
+                SupplierId = (string)orderData.supplierId,
+                SupplierName = (string)orderData.supplierName,
+                TotalCost = (decimal)orderData.totalCost,
+                ExpectedDeliveryDate = DateTime.Parse((string)orderData.expectedDeliveryDate),
                 OrderStatus = "Pending",
                 CreatedAt = DateTime.UtcNow
             };
 
             return order;
+        }
+        
+        /// <summary>
+        /// Get existing chat history for a work order from Cosmos DB
+        /// </summary>
+        private async Task<List<ChatMessage>> GetOrCreateWorkOrderChatHistoryAsync(string workOrderId)
+        {
+            var historyJson = await _cosmosService.GetWorkOrderChatHistoryAsync(workOrderId);
+            
+            if (string.IsNullOrEmpty(historyJson))
+            {
+                return new List<ChatMessage>();
+            }
+
+            try
+            {
+                var history = JsonConvert.DeserializeObject<List<ChatMessageDto>>(historyJson) ?? new List<ChatMessageDto>();
+                return history.Select(dto => dto.Role == "user" 
+                    ? (ChatMessage)new UserChatMessage(dto.Content)
+                    : (ChatMessage)new AssistantChatMessage(dto.Content)).ToList();
+            }
+            catch
+            {
+                return new List<ChatMessage>();
+            }
+        }
+
+        /// <summary>
+        /// Save chat history for a work order to Cosmos DB
+        /// </summary>
+        private async Task SaveWorkOrderChatHistoryAsync(string workOrderId, List<ChatMessage> chatHistory)
+        {
+            // Convert to serializable format (keep last 10 messages to manage token count)
+            var historyToSave = chatHistory
+                .TakeLast(10)
+                .Select(msg => new ChatMessageDto
+                {
+                    Role = msg is UserChatMessage ? "user" : "assistant",
+                    Content = msg is UserChatMessage userMsg ? userMsg.Content[0].Text : ((AssistantChatMessage)msg).Content[0].Text
+                }).ToList();
+
+            var historyJson = JsonConvert.SerializeObject(historyToSave);
+            await _cosmosService.SaveWorkOrderChatHistoryAsync(workOrderId, historyJson);
+        }
+
+        private class ChatMessageDto
+        {
+            public string Role { get; set; } = string.Empty;
+            public string Content { get; set; } = string.Empty;
+        }
+        
+        private string ExtractJsonFromResponse(string response)
+        {
+            // Extract JSON from markdown code blocks
+            var jsonStart = response.IndexOf("```json");
+            if (jsonStart >= 0)
+            {
+                jsonStart = response.IndexOf('\n', jsonStart) + 1;
+                var jsonEnd = response.IndexOf("```", jsonStart);
+                return response.Substring(jsonStart, jsonEnd - jsonStart).Trim();
+            }
+
+            // Try to find JSON object directly
+            jsonStart = response.IndexOf('{');
+            if (jsonStart >= 0)
+            {
+                var jsonEnd = response.LastIndexOf('}');
+                return response.Substring(jsonStart, jsonEnd - jsonStart + 1);
+            }
+
+            throw new Exception("Could not extract JSON from agent response");
         }
 
         private string BuildOrderingContext(

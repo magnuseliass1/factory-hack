@@ -1,9 +1,9 @@
-using Azure.AI.Projects;
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using SharedModels;
 using Newtonsoft.Json;
 using System.Text;
-using Azure.AI.Agents.Persistent;
+using OpenAI.Chat;
 
 namespace PredictiveMaintenanceAgent.Services
 {
@@ -11,16 +11,18 @@ namespace PredictiveMaintenanceAgent.Services
     {
         private readonly string _projectEndpoint;
         private readonly string _agentId;
+        private readonly CosmosDbService _cosmosService;
 
-        public PredictiveMaintenanceAgentService(string projectEndpoint, string agentId)
+        public PredictiveMaintenanceAgentService(string projectEndpoint, string agentId, CosmosDbService cosmosService)
         {
             _projectEndpoint = projectEndpoint;
             _agentId = agentId;
+            _cosmosService = cosmosService;
         }
 
         /// <summary>
-        /// Predict optimal maintenance schedule using AI
-        /// Note: Persistent agents inherently support memory through thread-based conversations
+        /// Predict optimal maintenance schedule using AI with persistent memory
+        /// Each machine gets its own conversation thread for continuous learning
         /// </summary>
         public async Task<MaintenanceSchedule> PredictMaintenanceScheduleAsync(
             WorkOrder workOrder,
@@ -30,42 +32,57 @@ namespace PredictiveMaintenanceAgent.Services
             // Build context for the AI agent
             var context = BuildPredictiveContext(workOrder, history, availableWindows);
 
-            // Use AIProjectClient for running the agent
-            var projectClient = new AIProjectClient(new Uri(_projectEndpoint), new DefaultAzureCredential());
-            var persistentClient = new PersistentAgentsClient(_projectEndpoint, new DefaultAzureCredential());
-            
-            //Get the agent
-            var agentResponse = await persistentClient.Administration.GetAgentAsync(_agentId);
-            
-            // For now, use a simple run without explicit thread management
-            // In production, you would create and reuse threads for conversation memory
-            // Example: var thread = await persistentClient.CreateThreadAsync();
-            
-            // Run the agent with the query - note this is a simplified version
-            // Full memory support requires thread creation and management
-            var response = new StringBuilder();
-            response.Append(context); // Placeholder - in real implementation, call the agent via API
-            
-            // For now, return a mock response structure
-            // TODO: Implement actual agent invocation with Azure.AI.Agents.Persistent SDK
-            // For now using a placeholder response
-            var mockScheduleJson = @"{
-                ""scheduledDate"": """ + DateTime.UtcNow.AddDays(1).ToString("o") + @""",
-                ""maintenanceWindow"": {
-                    ""id"": ""WIN-001"",
-                    ""startTime"": """ + DateTime.UtcNow.AddDays(1).ToString("o") + @""",
-                    ""endTime"": """ + DateTime.UtcNow.AddDays(1).AddHours(4).ToString("o") + @""",
-                    ""productionImpact"": ""Low"",
-                    ""isAvailable"": true
-                },
-                ""riskScore"": 75,
-                ""predictedFailureProbability"": 0.65,
-                ""recommendedAction"": ""URGENT"",
-                ""reasoning"": ""Based on historical data, maintenance should be scheduled soon.""
-            }";
+            // Get or create chat history for this machine
+            var chatHistory = await GetOrCreateMachineChatHistoryAsync(workOrder.MachineId);
+            Console.WriteLine($"   Using chat history with {chatHistory.Count} messages for machine: {workOrder.MachineId}");
 
+            // Create agent client
+            var endpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") ?? throw new Exception("AZURE_OPENAI_ENDPOINT not set"));
+            var deploymentName = Environment.GetEnvironmentVariable("AZURE_FOUNDRY_PROJECT_DEPLOYMENT_NAME") ?? "gpt-4o";
+            
+            var client = new AzureOpenAIClient(endpoint, new DefaultAzureCredential());
+            var chatClient = client.GetChatClient(deploymentName);
+
+            // Agent instructions
+            var instructions = @"You are a predictive maintenance expert specializing in industrial tire manufacturing equipment. Your role is to analyze historical maintenance data and recommend optimal maintenance schedules.
+
+When analyzing maintenance needs:
+1. Review historical failure patterns for the specific machine
+2. Calculate risk scores based on:
+   - Time since last maintenance
+   - Frequency of similar faults
+   - Average downtime costs
+   - Current machine criticality
+3. Determine optimal maintenance windows considering production impact
+4. Provide clear recommendations with detailed reasoning
+
+Always respond in valid JSON format as requested.";
+
+            // Build complete message list: system + history + new request
+            var messages = new List<ChatMessage>
+            {
+                new SystemChatMessage(instructions)
+            };
+            
+            // Add chat history (previous conversations for this machine)
+            messages.AddRange(chatHistory);
+            
+            // Add current request
+            messages.Add(new UserChatMessage(context));
+
+            // Call the model
+            var completion = await chatClient.CompleteChatAsync(messages);
+            var responseText = completion.Value.Content[0].Text;
+
+            // Store the conversation in chat history
+            chatHistory.Add(new UserChatMessage(context));
+            chatHistory.Add(new AssistantChatMessage(responseText));
+            await SaveMachineChatHistoryAsync(workOrder.MachineId, chatHistory);
+
+            var jsonResponse = ExtractJsonFromResponse(responseText);
+            
             // Parse the response into a MaintenanceSchedule object
-            var schedule = JsonConvert.DeserializeObject<MaintenanceSchedule>(mockScheduleJson);
+            var schedule = JsonConvert.DeserializeObject<MaintenanceSchedule>(jsonResponse);
 
             if (schedule == null)
             {
@@ -79,6 +96,55 @@ namespace PredictiveMaintenanceAgent.Services
             schedule.CreatedAt = DateTime.UtcNow;
 
             return schedule;
+        }
+        
+        /// <summary>
+        /// Get existing chat history for a machine from Cosmos DB
+        /// </summary>
+        private async Task<List<ChatMessage>> GetOrCreateMachineChatHistoryAsync(string machineId)
+        {
+            var historyJson = await _cosmosService.GetMachineChatHistoryAsync(machineId);
+            
+            if (string.IsNullOrEmpty(historyJson))
+            {
+                return new List<ChatMessage>();
+            }
+
+            try
+            {
+                var history = JsonConvert.DeserializeObject<List<ChatMessageDto>>(historyJson) ?? new List<ChatMessageDto>();
+                return history.Select(dto => dto.Role == "user" 
+                    ? (ChatMessage)new UserChatMessage(dto.Content)
+                    : (ChatMessage)new AssistantChatMessage(dto.Content)).ToList();
+            }
+            catch
+            {
+                return new List<ChatMessage>();
+            }
+        }
+
+        /// <summary>
+        /// Save chat history for a machine to Cosmos DB
+        /// </summary>
+        private async Task SaveMachineChatHistoryAsync(string machineId, List<ChatMessage> chatHistory)
+        {
+            // Convert to serializable format (keep last 10 messages to manage token count)
+            var historyToSave = chatHistory
+                .TakeLast(10)
+                .Select(msg => new ChatMessageDto
+                {
+                    Role = msg is UserChatMessage ? "user" : "assistant",
+                    Content = msg is UserChatMessage userMsg ? userMsg.Content[0].Text : ((AssistantChatMessage)msg).Content[0].Text
+                }).ToList();
+
+            var historyJson = JsonConvert.SerializeObject(historyToSave);
+            await _cosmosService.SaveMachineChatHistoryAsync(machineId, historyJson);
+        }
+
+        private class ChatMessageDto
+        {
+            public string Role { get; set; } = string.Empty;
+            public string Content { get; set; } = string.Empty;
         }
 
         private string BuildPredictiveContext(

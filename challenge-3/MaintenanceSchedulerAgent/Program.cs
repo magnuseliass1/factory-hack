@@ -6,7 +6,8 @@ namespace PredictiveMaintenanceAgent
 {
     class Program
     {
-        static async Task Main(string[] args)
+        // static async Task Main(string[] args)
+        static async Task MainProgram(string[] args)
         {
             Console.WriteLine("=== Predictive Maintenance Agent ===\n");
 
@@ -34,7 +35,7 @@ namespace PredictiveMaintenanceAgent
 
             // Initialize services
             var cosmosService = new CosmosDbService(cosmosEndpoint, cosmosKey, databaseName);
-            var agentService = new PredictiveMaintenanceAgentService(aiConnectionString, predMaintenanceAgentId);
+            var agentService = new PredictiveMaintenanceAgentService(aiConnectionString, predMaintenanceAgentId, cosmosService);
 
             // Get work order ID from command line or use default
             Console.WriteLine("1. Retrieving work order...");

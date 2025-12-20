@@ -14,9 +14,9 @@ By participating in this hackathon, you will learn how to:
 
 - **Master Microsoft Agent Framework** using the enterprise-grade SDK for building, orchestrating, and deploying sophisticated AI agents with sequential workflows and multi-agent systems
 - **Build Specialized Maintenance Agents** (Anomaly Detection, Fault Diagnosis, Repair Planner, Scheduler) with advanced prompt engineering, tool integration, and persistent memory capabilities
-- **Implement RAG Patterns** using Azure Cognitive Search for knowledge retrieval and intelligent root cause analysis
+- **Leverage GitHub Copilot for Agent Development** using specialized agents like @agentplanning to accelerate development through AI-driven code generation and architectural guidance
+- **Implement Persistent Agent Memory** using Microsoft Foundry's thread-based conversation memory to enable agents to maintain context and learn from historical patterns across multiple sessions
 - **Deploy Sequential Orchestration** leveraging Agent Framework workflows to coordinate specialized agents into cohesive maintenance pipelines
-- **Apply Enterprise Observability** using OpenTelemetry monitoring, Microsoft Foundry tracking, and comprehensive system observability for production-ready agent systems
 
 ## Architecture
 
@@ -36,11 +36,10 @@ The workflow follows the principle of **"right tool for the right job"** - using
 ## Challenges
 
 - **Challenge 00**: **[Environment Setup & Data Foundation](challenge-0/README.md)** : Set up your development environment, deploy Azure resources, configure environment variables, and seed sample factory data with 5 machines including pre-seeded warning conditions
-- **Challenge 01**: **[Anomaly Detection Agent](challenge-1/README.md)**: Build an agent that monitors IoT telemetry from tire manufacturing equipment, compares readings against thresholds, and detects anomalies using threshold-based logic
-- **Challenge 02**: **[Fault Diagnosis Agent](challenge-2/README.md)**: Build an agent that performs root cause analysis using RAG pattern with Azure Cognitive Search and GPT models, querying knowledge base articles and historical repairs
-- **Challenge 03**: **[Repair Planner Agent](challenge-3/README.md)**: Build an agent that creates work orders and validates resource availability across multiple systems (parts inventory, technicians, production schedule)
-- **Challenge 04**: **[Multi-Agent Orchestration](challenge-4/README.md)**: Build the Scheduler agent and orchestrate all 4 agents into a sequential workflow using Microsoft Agent Framework with comprehensive observability
-
+- **Challenge 01**: **[Anomaly Detection and Fault Diagnosis Agents](challenge-1/README.md)**: Build an agent that monitors IoT telemetry from tire manufacturing equipment, compares readings against thresholds, and detects anomalies using threshold-based logic
+- **Challenge 02**: **[Repair Planner Agent and AI-Driven Development](challenge-2/README.md)**: Learn agent-driven development with GitHub Copilot by using the @agentplanning agent to guide you through building a Repair Planner Agent in .NET
+- **Challenge 03**: **[Predictive Maintenance & Parts Ordering Agents with Memory](challenge-3/README.md)**: Build Predictive Maintenance and Parts Ordering agents using Microsoft Foundry's persistent memory layer to maintain context across sessions
+- **Challenge 04**: **[Multi-Agent Orchestration](challenge-4/README.md)**: Create the workflow of these 4 agents using Microsoft Agent Framework and deploy it to an Azure Container App
 
 
 ## Requirements
@@ -48,7 +47,7 @@ The workflow follows the principle of **"right tool for the right job"** - using
 To successfully complete this hackathon, you will need the following:
 
 - GitHub account to access the repository and run GitHub Codespaces and Github Copilot
-- Be familiar with Python programming, including handling JSON data and making API calls
+- Be familiar with Python or .NET programming, including handling JSON data and making API calls
 - Be familiar with Generative AI Solutions and Azure Services
 - An active Azure subscription, with Owner rights
 - Ability to provision resources in **Sweden Central** or [another supported region](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#global-standard-model-availability)

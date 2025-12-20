@@ -1,20 +1,19 @@
 using Azure.AI.Agents.Persistent;
 using Azure.Identity;
 
-namespace PartsOrderingAgent
+namespace PredictiveMaintenanceAgent
 {
     /// <summary>
-    /// Creates the Parts Ordering Agent in Microsoft Foundry using Microsoft Agent Framework
+    /// Creates the Predictive Maintenance Agent in Microsoft Foundry using Microsoft Agent Framework
     /// Agents created with PersistentAgentsClient appear in the NEW portal at https://ai.azure.com/nextgen
     /// Run this once to set up the agent, then use the returned Agent ID in your .env file
     /// </summary>
     class CreateAgent
     {
-        // Uncomment this to run CreateAgent, then comment it out again before running Program
         static async Task Main(string[] args)
         // static async Task MainCreate(string[] args)
         {
-            Console.WriteLine("=== Creating Parts Ordering Agent in Microsoft Foundry ===\n");
+            Console.WriteLine("=== Creating Maintenance Scheduler Agent in Microsoft Foundry ===\n");
             Console.WriteLine("Using Microsoft Agent Framework with PersistentAgentsClient");
             Console.WriteLine("Agent will appear in NEW portal at: https://ai.azure.com/nextgen\n");
 
@@ -37,29 +36,47 @@ namespace PartsOrderingAgent
                 );
 
                 // Define agent configuration
-                var agentName = "PartsOrderingAgent";
+                var agentName = "MaintenanceSchedulerAgent";
                 var deploymentName = Environment.GetEnvironmentVariable("AZURE_FOUNDRY_PROJECT_DEPLOYMENT_NAME") ?? "gpt-4o";
-                var instructions = @"You are a parts ordering specialist for industrial tire manufacturing equipment. Your role is to analyze inventory status and optimize parts ordering from suppliers.
+                var instructions = @"You are an expert maintenance scheduler specializing in optimizing maintenance timing for industrial manufacturing equipment. Your role is to find the perfect maintenance windows that minimize production disruption while ensuring equipment reliability.
 
-When processing parts orders:
-1. Review current inventory levels for required parts
-2. Check against minimum stock and reorder points
-3. Identify suppliers for needed parts considering:
-   - Lead time
-   - Reliability rating (High/Medium/Low)
-   - Cost optimization
-4. Create optimized orders by:
-   - Grouping parts by supplier when possible
-   - Prioritizing reliable suppliers with shorter lead times
-   - Calculating expected delivery dates
-   - Computing total order costs
+When scheduling maintenance:
+1. Analyze production schedules and capacity:
+   - Current production load and forecasts
+   - Peak vs. low production periods
+   - Shift schedules and staffing availability
+   - Planned shutdowns or holidays
+
+2. Evaluate resource availability:
+   - Technician schedules and expertise levels
+   - Parts inventory and delivery timelines
+   - Equipment and tool availability
+   - Budget and cost constraints
+
+3. Assess maintenance impact:
+   - Estimated downtime duration
+   - Production volume affected
+   - Revenue impact per hour of downtime
+   - Alternative production routing options
+
+4. Optimize scheduling windows:
+   - Prioritize weekends, off-shifts, or low-demand periods
+   - Batch multiple maintenance tasks when possible
+   - Coordinate with planned production shutdowns
+   - Balance urgency against production needs
+
+5. Consider dependencies:
+   - Upstream/downstream equipment dependencies
+   - Supply chain constraints
+   - Customer delivery commitments
+   - Safety and regulatory requirements
 
 Always provide:
-- Clear inventory status assessment
-- Supplier selection with justification
-- Expected delivery date calculation
-- Total cost breakdown
-- Order urgency level (CRITICAL, HIGH, NORMAL)
+- Recommended maintenance window with specific date/time
+- Production impact analysis (units lost, revenue impact)
+- Alternative windows if primary is not feasible
+- Coordination requirements (resources, parts, technicians)
+- Clear justification for the recommended schedule
 
 Respond in JSON format as specified in the user's request.";
 
@@ -78,9 +95,9 @@ Respond in JSON format as specified in the user's request.";
                 Console.WriteLine($"\nAgent Name: {agentName}");
                 Console.WriteLine($"Agent ID: {persistentAgent.Value.Id}");
                 Console.WriteLine($"\nAdd this to your environment variables:");
-                Console.WriteLine($"export PARTS_ORDERING_AGENT_ID={persistentAgent.Value.Id}");
+                Console.WriteLine($"export MAINTENANCE_SCHEDULER_AGENT_ID={persistentAgent.Value.Id}");
                 Console.WriteLine($"\nOr add to your .env file:");
-                Console.WriteLine($"PARTS_ORDERING_AGENT_ID={persistentAgent.Value.Id}");
+                Console.WriteLine($"MAINTENANCE_SCHEDULER_AGENT_ID={persistentAgent.Value.Id}");
                 Console.WriteLine($"\n🌐 View your agent in the NEW portal:");
                 Console.WriteLine($"  URL: https://ai.azure.com/nextgen");
                 Console.WriteLine($"  Navigate to: Build > Agents > {agentName}");
