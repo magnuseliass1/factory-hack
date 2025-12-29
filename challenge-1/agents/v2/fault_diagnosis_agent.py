@@ -1,25 +1,13 @@
 import asyncio
 import os
-import importlib.util
 from pathlib import Path
 from typing import Annotated
 from agent_framework import HostedMCPTool
 from azure.identity.aio import AzureCliCredential
-from agent_framework import ChatAgent
-from agent_framework.azure import AzureAIAgentClient, AzureAIClient
-from azure.ai.projects.aio import AIProjectClient
+from agent_framework.azure import AzureAIClient
 
 from azure.cosmos import CosmosClient
-from pydantic import Field
 from dotenv import load_dotenv
-from azure.ai.agents.models import (
-    ListSortOrder,
-    McpTool,
-    RequiredMcpToolCall,
-    RunStepActivityDetails,
-    SubmitToolApprovalAction,
-    ToolApproval,
-)
 load_dotenv(override=True)
 
 # Configuration
@@ -33,7 +21,6 @@ cosmos_key = os.environ.get("COSMOS_KEY")
 cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 database = cosmos_client.get_database_client("FactoryOpsDB")
 knowledge_container = database.get_container_client("KnowledgeBase")
-machines_container = database.get_container_client("Machines")
 mcp_endpoint = os.environ.get("MACHINE_MCP_SERVER_ENDPOINT")
 mcp_subscription_key = os.environ.get("APIM_SUBSCRIPTION_KEY")
 
@@ -46,19 +33,6 @@ def get_knowledge_data(machine_type: str) -> dict:
             enable_cross_partition_query=True
         ))
         return items
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def get_machine_data(machine_id: str) -> dict:
-    """Get machine data from Cosmos DB"""
-    try:
-        query = f"SELECT * FROM c WHERE c.id = '{machine_id}'"
-        items = list(machines_container.query_items(
-            query=query,
-            enable_cross_partition_query=True
-        ))
-        return items[0] if items else {"error": f"Machine {machine_id} not found"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -84,7 +58,8 @@ async def main():
                 
 
                         """,
-                    tools = [get_machine_data, get_knowledge_data]
+
+                    tools = [HostedMCPTool( name="Machine Data", url=mcp_endpoint, approval_mode="never_require",headers={"Ocp-Apim-Subscription-Key": mcp_subscription_key}), get_knowledge_data]
 
                     ) as agent,
                 ):
