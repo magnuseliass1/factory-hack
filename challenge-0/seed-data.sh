@@ -17,6 +17,7 @@ echo "🚀 Starting data seeding..."
 # Install required Python packages
 echo "📦 Installing required Python packages..."
 pip3 install azure-cosmos --quiet
+pip3 install azure-storage-blob --quiet
 
 # Create Python script to handle the data import
 cat > seed_data.py << 'EOF'
@@ -146,3 +147,73 @@ python3 seed_data.py
 rm seed_data.py
 
 echo "✅ Seeding complete!"
+
+# Upload kb-wiki markdown files to Azure Blob Storage
+echo "🚀 Uploading kb-wiki markdown files to Blob Storage..."
+
+# Create Python script to upload markdown files from kb-wiki
+cat > seed_blob_wiki.py << 'EOF'
+import os
+import glob
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
+def get_blob_service_client_from_env():
+    """Create BlobServiceClient using AZURE_STORAGE_CONNECTION_STRING only."""
+    conn = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+    if not conn:
+        raise RuntimeError("Missing AZURE_STORAGE_CONNECTION_STRING in environment.")
+    return BlobServiceClient.from_connection_string(conn)
+
+def upload_markdown_files(container_name: str, folder_path: str):
+    service_client = get_blob_service_client_from_env()
+    container_client = service_client.get_container_client(container_name)
+    try:
+        container_client.create_container()
+        print(f"✅ Created container '{container_name}'")
+    except Exception as e:
+        # Likely already exists; continue
+        print(f"ℹ️ Container '{container_name}' ready or exists: {e}")
+
+    files = glob.glob(os.path.join(folder_path, '*.md'))
+    if not files:
+        print(f"⚠️ No markdown files found in {folder_path}")
+        return
+
+    content_settings = ContentSettings(content_type='text/markdown; charset=utf-8')
+    uploaded = 0
+    for fpath in files:
+        blob_name = os.path.basename(fpath)
+        try:
+            with open(fpath, 'rb') as f:
+                container_client.upload_blob(name=blob_name, data=f, overwrite=True, content_settings=content_settings)
+            uploaded += 1
+            print(f"✅ Uploaded {blob_name}")
+        except Exception as e:
+            print(f"❌ Failed to upload {blob_name}: {e}")
+
+    print(f"✅ Completed upload: {uploaded} file(s) to '{container_name}'")
+
+def main():
+    # Resolve container and folder
+    container_name = 'machine-wiki' 
+    folder_path = os.path.join('data', 'kb-wiki')
+
+    if not os.path.isdir(folder_path):
+        raise RuntimeError(f"kb-wiki folder not found at {folder_path}")
+
+    if not os.environ.get('AZURE_STORAGE_CONNECTION_STRING'):
+        raise RuntimeError("Missing storage credentials. Set AZURE_STORAGE_CONNECTION_STRING in environment.")
+
+    upload_markdown_files(container_name, folder_path)
+
+if __name__ == '__main__':
+    main()
+EOF
+
+echo "🐍 Running kb-wiki upload script..."
+python3 seed_blob_wiki.py
+
+# Clean up uploader script
+rm seed_blob_wiki.py
+
+echo "✅ Blob upload complete!"

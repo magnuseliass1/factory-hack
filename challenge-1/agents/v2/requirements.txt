@@ -1,6 +1,7 @@
 azure-identity
 azure-cosmos
 agent-framework
+azure-search-documents
 # azure-ai-agents
 # agent-framework-core
 # agent-framework-azure-ai
