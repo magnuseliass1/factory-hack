@@ -26,8 +26,10 @@ from azure.ai.projects.aio import AIProjectClient
 from agent_framework import ChatAgent
 from agent_framework_azure_ai import AzureAIAgentClient
 from pydantic import Field
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+load_dotenv(override=True)
 
 
 # =============================================================================

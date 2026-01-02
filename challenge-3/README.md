@@ -2,224 +2,131 @@
 
 **Expected Duration:** 60 minutes
 
-## 🚀 Quick Start (Python Implementation)
+## Introduction
 
-This challenge is implemented in **Python** using the **Microsoft Agent Framework** with Azure AI Foundry integration.
+In this challenge, you'll work with two specialized AI agents that optimize factory operations through intelligent maintenance scheduling and automated supply chain management. Both agents interact with Cosmos DB to read work orders, analyze data, and save their outputs back to the database.
 
-### Files in this Challenge
+### Agent Overview
 
-- `maintenance_scheduler.py` - Self-contained predictive maintenance scheduling agent
-- `parts_ordering.py` - Self-contained parts ordering automation agent
-- `README.md` - This file
+**Maintenance Scheduler Agent** (`maintenance_scheduler.py`)
+- Analyzes work orders and historical maintenance data
+- Finds optimal maintenance windows that minimize production disruption
+- Generates predictive maintenance schedules with risk assessment
+- Saves schedules to Cosmos DB `MaintenanceSchedules` container
+- Updates work order status to 'Scheduled'
 
-### Installation
+**Parts Ordering Agent** (`parts_ordering.py`)
+- Checks inventory levels for required parts
+- Evaluates supplier performance and lead times
+- Generates optimized parts orders with cost analysis
+- Saves orders to Cosmos DB `PartsOrders` container
+- Updates work order status to 'PartsOrdered' or 'Ready'
 
-```bash
-# From the workspace root:
-cd /workspaces/factory-ops-hack
+### Cosmos DB Integration
 
-# Install dependencies (--pre flag required while in preview)
-pip install --pre -r requirements.txt
+Both agents interact with Azure Cosmos DB as their primary data store:
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your credentials
+#### Containers Used
 
-# Authenticate with Azure
-az login
+| Container | Purpose | Agent Usage |
+|-----------|---------|-------------|
+| **WorkOrders** | Work orders from Repair Planner | Read by both agents to get job details |
+| **Machines** | Equipment information | Referenced for machine context |
+| **MaintenanceHistory** | Historical maintenance records | Read by Maintenance Scheduler for pattern analysis |
+| **MaintenanceWindows** | Available production windows | Read by Maintenance Scheduler to find optimal timing |
+| **MaintenanceSchedules** | Generated maintenance schedules | **Written by Maintenance Scheduler** |
+| **PartsInventory** | Current stock levels | Read by Parts Ordering to check availability |
+| **Suppliers** | Supplier information | Read by Parts Ordering for sourcing decisions |
+| **PartsOrders** | Generated parts orders | **Written by Parts Ordering Agent** |
+
+#### Data Flow
+
 ```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        MAINTENANCE SCHEDULER AGENT                          │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-### Run the Agents
+Input (READ):                         Output (WRITE):
+├─ WorkOrders                         ├─ MaintenanceSchedules
+├─ MaintenanceHistory                 │  └─ scheduled_date
+├─ MaintenanceWindows                 │  └─ risk_score (0-100)
+└─ Machines                            │  └─ predicted_failure_probability
+                                      │  └─ recommended_action
+                                      │  └─ maintenance_window
+                                      │  └─ reasoning
+                                      └─ WorkOrders (status update to 'Scheduled')
 
-```bash
-# Navigate to challenge-3
-cd challenge-3
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PARTS ORDERING AGENT                               │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-# Run Maintenance Scheduler Agent
-python maintenance_scheduler.py wo-2024-445
-
-# Run Parts Ordering Agent  
-python parts_ordering.py wo-2024-456
+Input (READ):                         Output (WRITE):
+├─ WorkOrders                         ├─ PartsOrders
+├─ PartsInventory                     │  └─ supplier_id, supplier_name
+├─ Suppliers                          │  └─ order_items (part, qty, cost)
+└─ Machines                            │  └─ total_cost
+                                      │  └─ expected_delivery_date
+                                      │  └─ reasoning
+                                      └─ WorkOrders (status update to 'PartsOrdered' or 'Ready')
 ```
-
-**Note:** The agents will automatically register themselves in the Azure AI Foundry portal when they run. You can view them at:
-- **Portal URL**: https://ai.azure.com
-- Navigate to your project → Build → Agents/Assistants
-- Look for: `MaintenanceSchedulerAgent` and `PartsOrderingAgent`
 
 ---
 
-## Introduction
+## Part 1: Maintenance Scheduler Agent
 
-In this challenge, you'll build two specialized AI agents that work together to optimize factory operations through intelligent maintenance scheduling and automated supply chain management:
+The Maintenance Scheduler Agent analyzes work orders and determines the optimal time to perform maintenance by balancing equipment reliability needs against production impact.
 
-- **Maintenance Scheduler Agent**: Finds optimal maintenance windows that minimize production disruption while ensuring equipment reliability. It analyzes production schedules, resource availability, and operational constraints to recommend the perfect timing for scheduled maintenance activities.
+### What It Does
 
-- **Parts Ordering Agent**: Monitors inventory levels, evaluates supplier performance, and automates parts ordering to ensure required components are available when needed. It optimizes order timing, supplier selection, and delivery schedules to support maintenance operations.
+1. **Reads Work Order** from `WorkOrders` container
+2. **Analyzes Historical Data** from `MaintenanceHistory` container to understand failure patterns
+3. **Checks Available Windows** from `MaintenanceWindows` container to find low-impact periods
+4. **Runs AI Analysis** using Microsoft Agent Framework to assess risk and recommend timing
+5. **Saves Schedule** to `MaintenanceSchedules` container with risk scores and recommendations
+6. **Updates Work Order** status to 'Scheduled'
 
-
-### What is Agent Memory?
-
-In this challenge, we implement **chat history memory** using the Microsoft Agent Framework pattern. This allows agents to maintain context across multiple interactions by storing conversation history in Cosmos DB.
-
-**Chat History Memory** stores the conversation messages (both user and assistant) for each entity:
-- The **Maintenance Scheduler Agent** maintains separate chat histories for each machine, allowing it to learn scheduling preferences, production patterns, and optimal maintenance windows over time
-- The **Parts Ordering Agent** maintains separate chat histories for each work order, helping it learn from past supplier performance and ordering decisions
-
-This implementation follows the **AgentWithMemory_Step01_ChatHistoryMemory** pattern from the Microsoft Agent Framework, providing persistent context without requiring complex vector embeddings or portal-managed threads.
-
-### How Memory Works in Our Agents
-
-Our agents use **chat history memory** stored in Cosmos DB, following the Microsoft Agent Framework's memory pattern:
-
-#### Chat History Memory (Conversation Context)
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    MAINTENANCE SCHEDULER AGENT MEMORY                       │
-│                    (Cosmos DB ChatHistories Container)                      │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  Session 1              Session 2              Session 3
-  ─────────              ─────────              ─────────
-     │                       │                       │
-     ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Chat History: Machine-001 (Last 10 messages)               │
-│  ───────────────────────────────────────────────────────   │
-│  User: "Find maintenance window for Machine-001"            │
-│  Agent: "Optimal window: Sat 3AM-7AM, 0 production impact"  │
-│  User: "What about weekday options?"                        │
-│  Agent: "Tuesday 11PM-3AM: 15% production, saves $2K"       │
-│  User: "Schedule for Saturday"                              │
-│  Agent: "Confirmed: Sat 3AM, technician assigned, parts OK" │
-└─────────────────────────────────────────────────────────────┘
-                         ▲
-                         │
-                Cosmos DB (JSON)
-              {id, machineId, history}
-
-Example document in ChatHistories container:
-```json
-{
-  "id": "machine-001-history",
-  "entityId": "machine-001",
-  "entityType": "machine",
-  "purpose": "maintenance_scheduling",
-  "historyJson": "[{\"toRole\":\"user\",\"content\":\"Find optimal maintenance window for Machine-001\"},{\"toRole\":\"assistant\",\"content\":\"Optimal window: Saturday 3AM-7AM. Zero production impact, technicians available, estimated 4hr downtime.\"},{\"toRole\":\"user\",\"content\":\"What about weekday options?\"},{\"toRole\":\"assistant\",\"content\":\"Alternative: Tuesday 11PM-3AM affects 15% production but saves $2K in weekend premium costs.\"}]",
-  "updatedAt": "2025-12-20T10:30:00Z"
-}
-```
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      PARTS ORDERING AGENT MEMORY                            │
-│                    (Cosmos DB ChatHistories Container)                      │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  Session 1              Session 2              Session 3
-  ─────────              ─────────              ─────────
-     │                       │                       │
-     ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Chat History: WO-2024-445 (Last 10 messages)               │
-│  ───────────────────────────────────────────────────────    │
-|  User: "Order parts from Supplier-A"                        │
-│  Agent: "Ordered Belt-B2000, ETA: 5 days"                   │
-│  User: "Update: Supplier-A delayed to 8 days"               │
-│  Agent: "Noted: Supplier-A reliability decreased"           │
-│  User: "Order same part again"                              │
-│  Agent: "Recommending Supplier-B (better track record)"     │
-└─────────────────────────────────────────────────────────────┘
-                         ▲
-                         │
-                Cosmos DB (JSON)
-           {id, workOrderId, history}
-```
-
-**Chat History Memory Benefits:**
-- **Persistent Context**: Chat history survives across sessions and application restarts
-- **Entity-Specific Intelligence**: Each machine or work order maintains its own conversation history
-- **Simple & Reliable**: Direct message storage in Cosmos DB - no complex embeddings or indexing
-- **Token-Efficient**: Stores only last 10 messages per entity to manage context window
-
-### How It Works
-
-1. **First request** for Machine-001 → Creates empty chat history, processes request, saves conversation to Cosmos DB `ChatHistories` container
-2. **Second request** for Machine-001 → Retrieves previous messages, adds to context, processes request, saves updated history
-3. **Request** for Machine-002 → Creates separate chat history, independent from Machine-001
-4. **Service restart** → Chat histories persist in Cosmos DB, no memory lost
-
-## Agent Architecture
-
-Both agents are **self-contained Python files** that include:
-- Data models (dataclasses)
-- Cosmos DB service layer
-- AI agent logic with Microsoft Agent Framework
-- Portal registration using Azure AI Projects SDK
-- Main execution workflow
-
-### Key Features
-
-✅ **Portal Registration**: Agents automatically register in Azure AI Foundry portal with versioning  
-✅ **Chat History Memory**: Conversation context persisted in Cosmos DB per entity (machine/work order)  
-✅ **Self-Contained**: No imports between files - each agent is fully independent  
-✅ **Azure Authentication**: Uses `DefaultAzureCredential` for seamless Azure authentication  
-✅ **Production-Ready**: Error handling, async/await, proper resource cleanup  
-
-## Running the Maintenance Scheduler Agent
+### Running the Agent
 
 ```bash
 cd /workspaces/factory-ops-hack/challenge-3
-python maintenance_scheduler.py wo-2024-445
+python maintenance_scheduler.py WO-001
 ```
 
-**Expected Output:**
-1. ✓ Registers agent in Azure AI Foundry portal (if not already registered)
-2. ✓ Retrieves work order from Cosmos DB
-3. ✓ Analyzes historical maintenance data
-4. ✓ Checks available maintenance windows (14-day window)
-5. ✓ Runs AI predictive analysis with chat history context
-6. ✓ Generates maintenance schedule with risk scoring
-7. ✓ Saves schedule to Cosmos DB
-8. ✓ Updates work order status to 'Scheduled'
+### Expected Output
 
-**What the agent does:**
-- Analyzes production schedules and identifies low-impact periods
-- Evaluates historical maintenance patterns for the machine
-- Calculates risk scores (0-100) and failure probability
-- Recommends actions: IMMEDIATE, URGENT, SCHEDULED, or MONITOR
-- Maintains chat history per machine for contextual learning
-- Balances urgency against production impact
-
-**Sample Output:**
 ```
 === Predictive Maintenance Agent ===
 
 1. Retrieving work order...
-   ✓ Work Order: wo-2024-445
+   ✓ Work Order: WO-001
    Machine: machine-001
+   Fault: Temperature Sensor Malfunction
    Priority: high
 
 2. Analyzing historical maintenance data...
-   ✓ Found 0 historical maintenance records
+   ✓ Found 3 historical maintenance records
 
 3. Checking available maintenance windows...
-   ✓ Found 14 available windows in next 14 days
+   ✓ Found 17 available windows in next 14 days
 
 4. Running AI predictive analysis...
-   Using persistent chat history for machine: machine-001
    ✓ Analysis complete!
 
 === Predictive Maintenance Schedule ===
-Schedule ID: sched-1767354115.311513
+Schedule ID: sched-1735845678
 Machine: machine-001
-Scheduled Date: 2026-01-03 22:00
+Scheduled Date: 2026-01-04 22:00
 Window: 22:00 - 06:00
 Production Impact: Low
 Risk Score: 85/100
 Failure Probability: 70.0%
 Recommended Action: URGENT
+
+Reasoning:
+Given the high priority work order and historical pattern of temperature sensor 
+failures on machine-001, immediate scheduling is recommended. The selected 
+weekend night window (Saturday 10PM - Sunday 6AM) minimizes production impact 
+while addressing the critical temperature sensor issue before potential failure.
 
 5. Saving maintenance schedule...
    ✓ Schedule saved to Cosmos DB
@@ -230,44 +137,194 @@ Recommended Action: URGENT
 ✓ Predictive Maintenance Agent completed successfully!
 ```
 
-## Running the Parts Ordering Agent
+### What Gets Saved to Cosmos DB
+
+**MaintenanceSchedules Container:**
+```json
+{
+  "id": "sched-1735845678",
+  "workOrderId": "WO-001",
+  "machineId": "machine-001",
+  "scheduledDate": "2026-01-04T22:00:00Z",
+  "maintenanceWindow": {
+    "id": "mw-2026-01-04-night",
+    "startTime": "2026-01-04T22:00:00Z",
+    "endTime": "2026-01-05T06:00:00Z",
+    "productionImpact": "Low"
+  },
+  "riskScore": 85.0,
+  "predictedFailureProbability": 0.70,
+  "recommendedAction": "URGENT",
+  "reasoning": "Given the high priority work order and historical pattern...",
+  "createdAt": "2026-01-02T15:30:00Z"
+}
+```
+
+**WorkOrders Container (Updated):**
+```json
+{
+  "id": "WO-001",
+  "machineId": "machine-001",
+  "status": "Scheduled",  // ← Updated from "Created"
+  ...
+}
+```
+
+---
+
+## Part 2: Parts Ordering Agent
+
+The Parts Ordering Agent checks inventory availability and generates optimized parts orders by evaluating supplier reliability, lead times, and costs.
+
+### What It Does
+
+1. **Reads Work Order** from `WorkOrders` container to get required parts
+2. **Checks Inventory** from `PartsInventory` container to determine what's in stock
+3. **Identifies Missing Parts** that need to be ordered
+4. **Finds Suppliers** from `Suppliers` container that can provide the parts
+5. **Runs AI Analysis** to optimize supplier selection based on reliability, lead time, and cost
+6. **Saves Parts Order** to `PartsOrders` container with order details
+7. **Updates Work Order** status to 'PartsOrdered' (or 'Ready' if all parts available)
+
+### Running the Agent
 
 ```bash
 cd /workspaces/factory-ops-hack/challenge-3
-python parts_ordering.py wo-2024-456
+python parts_ordering.py WO-002
 ```
 
-**Expected Output:**
-1. ✓ Registers agent in Azure AI Foundry portal (if not already registered)
-2. ✓ Retrieves work order from Cosmos DB
-3. ✓ Checks inventory status for required parts
-4. ✓ Identifies parts needing ordering
-5. ✓ Finds available suppliers from SCM system
-6. ✓ Generates optimized parts order using AI
-7. ✓ Saves order to Cosmos DB
-8. ✓ Updates work order status
+### Expected Output (When Parts Need Ordering)
 
-**What the agent does:**
-- Checks current inventory levels vs reorder points
-- Evaluates supplier reliability, lead time, and costs
-- Generates optimal parts orders with supplier selection
-- Maintains chat history per work order for learning
-- Calculates expected delivery dates
-- Optimizes order costs while meeting urgency requirements
+```
+=== Parts Ordering Agent ===
 
+1. Retrieving work order...
+   ✓ Work Order: WO-002
+   Machine: machine-002
+   Required Parts: 2
+   Priority: medium
 
-**How it works:**
-1. First request for Machine-001 → Creates empty chat history, processes request, saves messages to Cosmos DB `ChatHistories` container
-2. Second request for Machine-001 → Retrieves previous messages, adds to context, processes request, saves updated history
-3. Request for Machine-002 → Creates separate chat history, independent from Machine-001
-4. Service restart → Chat histories persist in Cosmos DB, no memory lost
+2. Checking inventory status...
+   ✓ Found 2 inventory records
 
-**Benefits of this approach:**
-- **Simple & Reliable**: Direct JSON storage in Cosmos DB - no complex indexing or vector embeddings
-- **Survives restarts**: Chat history persists even when the application restarts
-- **Token-Efficient**: Stores only last 10 messages per entity to keep context window manageable
-- **Entity-Specific**: Each machine/work order maintains its own conversation context
-- **Transparent**: Easy to inspect, debug, and understand stored conversation data
+⚠️  2 part(s) need to be ordered:
+   - Drum Bearing (Qty: 1)
+   - Tension Sensor Module (Qty: 1)
+
+3. Finding suppliers...
+   ✓ Found 3 potential suppliers
+
+4. Running AI parts ordering analysis...
+   ✓ Parts order generated!
+
+=== Parts Order ===
+Order ID: po-1735845789
+Work Order: WO-002
+Supplier: Industrial Parts Co (ID: SUP-001)
+Expected Delivery: 2026-01-07
+Total Cost: $1340.00
+Status: Pending
+
+Order Items:
+  - Drum Bearing (#PART-006)
+    Qty: 1 @ $890.00 = $890.00
+  - Tension Sensor Module (#PART-005)
+    Qty: 1 @ $450.00 = $450.00
+
+5. Saving parts order...
+   ✓ Order saved to SCM system
+
+6. Updating work order status...
+   ✓ Work order status updated to 'PartsOrdered'
+
+✓ Parts Ordering Agent completed successfully!
+```
+
+### Expected Output (When All Parts Available)
+
+```
+=== Parts Ordering Agent ===
+
+1. Retrieving work order...
+   ✓ Work Order: WO-001
+   Machine: machine-001
+   Required Parts: 1
+   Priority: high
+
+2. Checking inventory status...
+   ✓ Found 1 inventory records
+
+✓ All required parts are available in stock!
+No parts order needed.
+
+3. Updating work order status...
+   ✓ Work order status updated to 'Ready'
+
+✓ Parts Ordering Agent completed successfully!
+```
+
+### What Gets Saved to Cosmos DB
+
+**PartsOrders Container:**
+```json
+{
+  "id": "po-1735845789",
+  "workOrderId": "WO-002",
+  "supplierId": "SUP-001",
+  "supplierName": "Industrial Parts Co",
+  "orderItems": [
+    {
+      "partNumber": "PART-006",
+      "partName": "Drum Bearing",
+      "quantity": 1,
+      "unitCost": 890.00,
+      "totalCost": 890.00
+    },
+    {
+      "partNumber": "PART-005",
+      "partName": "Tension Sensor Module",
+      "quantity": 1,
+      "unitCost": 450.00,
+      "totalCost": 450.00
+    }
+  ],
+  "totalCost": 1340.00,
+  "expectedDeliveryDate": "2026-01-07T00:00:00Z",
+  "orderStatus": "Pending",
+  "reasoning": "Selected Industrial Parts Co based on high reliability rating...",
+  "createdAt": "2026-01-02T15:35:00Z"
+}
+```
+
+**WorkOrders Container (Updated):**
+```json
+{
+  "id": "WO-002",
+  "machineId": "machine-002",
+  "status": "PartsOrdered",  // ← Updated from "Created"
+  ...
+}
+```
+
+---
+
+## Agent Architecture
+
+Both agents are **self-contained Python files** that include:
+- **Data models** (dataclasses for type safety)
+- **Cosmos DB service layer** (read/write operations)
+- **AI agent logic** using Microsoft Agent Framework
+- **Portal registration** using Azure AI Projects SDK
+- **Main execution workflow** with error handling
+
+### Key Features
+
+✅ **Cosmos DB Integration**: Direct read/write operations with multiple containers  
+✅ **Portal Registration**: Agents automatically register in Azure AI Foundry with versioning  
+✅ **Self-Contained**: Each agent is fully independent with no cross-dependencies  
+✅ **Azure Authentication**: Uses `DefaultAzureCredential` for seamless auth  
+✅ **Production-Ready**: Async/await, error handling, proper resource cleanup  
+✅ **AI-Powered Decision Making**: Uses GPT-4 for intelligent analysis and recommendations  
 
 ## Viewing Agents in Azure AI Foundry Portal
 
@@ -281,27 +338,26 @@ After running the agents, you can view them in the Azure AI Foundry portal:
    - `PartsOrderingAgent` - Parts ordering automation
 
 Each agent includes:
-- Model configuration (gpt-4.1-mini)
+- Model configuration (gpt-4o-mini)
 - System instructions
 - Version metadata
 - Creation timestamp
 
-
 ## Learn More
 
-Congratulations! You've successfully deployed two AI agents using the Microsoft Agent Framework. You've learned how to:
+Congratulations! You've successfully worked with two AI agents that integrate deeply with Cosmos DB. You've learned how to:
 
-✅ **Build self-contained agents** - Complete agent logic in single Python files  
-✅ **Register agents in Azure AI Foundry** - Programmatic portal registration with versioning  
-✅ **Implement chat history memory** - Persistent conversation context in Cosmos DB  
+✅ **Read from Cosmos DB** - Query work orders, history, inventory, and supplier data  
+✅ **Write to Cosmos DB** - Save generated schedules and parts orders  
+✅ **Update existing records** - Change work order status based on agent actions  
 ✅ **Use Microsoft Agent Framework** - Modern agent architecture with `ChatAgent`  
-✅ **Integrate with Azure services** - Cosmos DB, Azure AI Foundry, Azure OpenAI  
-✅ **Manage conversation context** - Entity-specific memory (per machine/work order)  
-✅ **Build production-ready agents** - Error handling, async/await, resource cleanup  
+✅ **Integrate with Azure AI Foundry** - Register agents and use deployed models  
+✅ **Build data-driven agents** - Combine database queries with AI analysis  
+✅ **Handle multiple containers** - Work with complex data relationships  
 
 These agents demonstrate how AI can optimize factory operations by:
-- Finding optimal maintenance windows that minimize production disruption
-- Analyzing historical patterns and risk factors for intelligent scheduling
-- Automating inventory management and supplier selection
-- Maintaining conversation context for contextual decision-making
-- Learning from previous interactions to improve recommendations
+- **Predictive Scheduling**: Finding optimal maintenance windows using historical data
+- **Risk Assessment**: Calculating failure probability and recommending actions
+- **Inventory Management**: Automatically checking stock and ordering needed parts
+- **Supplier Optimization**: Selecting best suppliers based on reliability and lead time
+- **Workflow Automation**: Updating work order status as tasks complete
