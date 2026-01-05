@@ -148,7 +148,9 @@
         "publicNetworkAccess": "enabled",
         "disableLocalAuth": false,
         "authOptions": {
-          "apiKeyOnly": {}
+          "aadOrApiKey": { 
+            "aadAuthFailureMode": "http401WithBearerChallenge" 
+          }
         }
       }
     },
