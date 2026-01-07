@@ -8,9 +8,8 @@ from dotenv import load_dotenv
 
 # TODO: add HostedMCPTool import
 
-load_dotenv(override=True)
-
 # Configuration
+load_dotenv(override=True)
 project_endpoint = os.environ.get("AZURE_AI_PROJECT_ENDPOINT")
 
 # Initialize Cosmos DB clients globally for function tools
@@ -81,9 +80,8 @@ async def main():
                             - summary: human readable summary of the anomalies 
 
                             """,
-                    tools=[
-                        get_machine_data,
-                        get_thresholds]
+
+                    tools=[get_machine_data, get_thresholds]
 
                 ) as agent,
             ):

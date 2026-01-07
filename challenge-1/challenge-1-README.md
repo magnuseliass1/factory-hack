@@ -190,6 +190,7 @@ Currently only one tool `machine_data` is available. Your task is to add the kno
                   headers={"api-key": search_key})
     ```
 
+
     > [!TIP]
     > The tools property is a list so make sure you add a trailing comma after the first tool
 

@@ -35,8 +35,8 @@ The workflow follows the principle of **"right tool for the right job"** - using
 
 ## Challenges
 
-- **Challenge 00**: **[Environment Setup & Data Foundation](challenge-0/README.md)** : Set up your development environment, deploy Azure resources, configure environment variables, and seed sample factory data with 5 machines including pre-seeded warning conditions
-- **Challenge 01**: **[Anomaly Detection and Fault Diagnosis Agents](challenge-1/README.md)**: Build an agent that monitors IoT telemetry from tire manufacturing equipment, compares readings against thresholds, and detects anomalies using threshold-based logic
+- **Challenge 00**: **[Environment Setup & Data Foundation](challenge-0/challenge-0-README.md)** : Set up your development environment, deploy Azure resources, configure environment variables, and seed sample factory data with 5 machines including pre-seeded warning conditions
+- **Challenge 01**: **[Anomaly Detection and Fault Diagnosis Agents](challenge-1/challenge-1-README.md)**: Build an agent that monitors IoT telemetry from tire manufacturing equipment, compares readings against thresholds, and detects anomalies using threshold-based logic
 - **Challenge 02**: **[Repair Planner Agent and AI-Driven Development](challenge-2/README.md)**: Learn agent-driven development with GitHub Copilot by using the @agentplanning agent to guide you through building a Repair Planner Agent in .NET
 - **Challenge 03**: **[Predictive Maintenance & Parts Ordering Agents with Memory](challenge-3/README.md)**: Build Predictive Maintenance and Parts Ordering agents using Microsoft Foundry's persistent memory layer to maintain context across sessions
 - **Challenge 04**: **[Multi-Agent Orchestration](challenge-4/README.md)**: Create the workflow of these 4 agents using Microsoft Agent Framework and deploy it to an Azure Container App
