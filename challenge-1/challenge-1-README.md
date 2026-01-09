@@ -174,7 +174,7 @@ Examine the Python code in [fault_diagnosis_agent.py](./agents/fault_diagnosis_a
 Currently only one tool `machine_data` is available. Your task is to add the knowledge base MCP tool to the agent so the machine wiki content can be used when diagnosing the root cause of the anomaly.
 
 1. Locate placeholder comment `# TODO: add Foundry IQ MCP tool`  in [fault_diagnosis_agent.py](./agents/fault_diagnosis_agent.py)
-2. Add the knowledge base as a `HostedMCPTool` by updating the placeholder with the following code
+2. Add the knowledge base as an `MCPTool` by updating the placeholder with the following code
 
     ```python
     
