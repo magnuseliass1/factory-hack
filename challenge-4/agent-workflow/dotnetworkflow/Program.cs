@@ -103,9 +103,8 @@ static async Task<IResult> AnalyzeMachine(
         Console.WriteLine($"Agent retrieved (name: {faultDiagnosisAgent.Name}, id: {faultDiagnosisAgent.Id})");
         Console.WriteLine($"Agent retrieved (name: {anomalyClassificationAgent.Name}, id: {anomalyClassificationAgent.Id})");
         
-        var telemetryJson = request.telemetry.ValueKind == JsonValueKind.Undefined
-            ? string.Empty
-            : request.telemetry.GetRawText();
+        var telemetryJson = JsonSerializer.Serialize(request);
+        Console.WriteLine($"Telemetry JSON: {telemetryJson}");
 
         var workflow = AgentWorkflowBuilder.BuildSequential(anomalyClassificationAgent, faultDiagnosisAgent);
         var result = new List<Microsoft.Extensions.AI.ChatMessage>();
@@ -116,14 +115,30 @@ static async Task<IResult> AnalyzeMachine(
         {
             if (evt is AgentRunUpdateEvent e)
             {
-                // if (e.Update.Contents.OfType<FunctionCallContent>().FirstOrDefault() is FunctionCallContent call)
-                // {
-                //     logger.LogInformation(
-                //         "Calling function '{CallName}' with arguments: {Args}",
-                //         call.Name,
-                //         JsonSerializer.Serialize(call.Arguments));
-                // }
+                if (e.Update.Contents.OfType<FunctionCallContent>().FirstOrDefault() is FunctionCallContent call)
+                {
+                    logger.LogInformation(
+                        "Calling function '{CallName}' with arguments: {Args}",
+                        call.Name,
+                        JsonSerializer.Serialize(call.Arguments));
+                }
+#pragma warning disable MEAI001 // Evaluation-only API; suppress to allow compilation.
+                else if (e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolCallContent>().FirstOrDefault() is McpServerToolCallContent mcpCall)
+                {
+                    logger.LogInformation(
+                        "Calling function '{CallName}' with arguments: {Args}",
+                        mcpCall.ToolName,
+                        JsonSerializer.Serialize(mcpCall.Arguments));
+                }
+                else if(e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolResultContent>().FirstOrDefault() is McpServerToolResultContent mcpCallResult)
+                {
+                    logger.LogInformation(
+                        "Function result: {Message}",
+                        mcpCallResult.Output);
+                }
+#pragma warning restore MEAI001
             }
+            
             else if (evt is WorkflowOutputEvent output)
             {
                 Console.WriteLine(evt.Data);
