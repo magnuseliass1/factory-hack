@@ -516,9 +516,9 @@ try
     );
 
     var aiService = new AIFoundryService(
-        configuration["AI_FOUNDRY_ENDPOINT"],
-        configuration["AI_FOUNDRY_KEY"],
-        configuration["AI_MODEL_DEPLOYMENT_NAME"]
+        configuration["AZURE_AI_CHAT_ENDPOINT"],
+        configuration["AZURE_AI_CHAT_KEY"],
+        configuration["AZURE_AI_CHAT_MODEL_DEPLOYMENT_NAME"]
     );
 
     var repairPlanner = new RepairPlanner(

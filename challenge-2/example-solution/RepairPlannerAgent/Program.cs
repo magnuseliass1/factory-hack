@@ -17,7 +17,7 @@ public static class Program
 
         var aiEndpoint = Environment.GetEnvironmentVariable("AZURE_AI_CHAT_ENDPOINT");
         var aiKey = Environment.GetEnvironmentVariable("AZURE_AI_CHAT_KEY");
-        var aiModelDeployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME");
+        var aiModelDeployment = Environment.GetEnvironmentVariable("AZURE_AI_CHAT_MODEL_DEPLOYMENT_NAME");
 
         if (string.IsNullOrWhiteSpace(cosmosEndpoint) ||
             string.IsNullOrWhiteSpace(cosmosKey) ||
