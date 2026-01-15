@@ -99,13 +99,6 @@ For Repair Planning specifically:
 4. Provide examples for different scenarios
 5. Suggest UI for visualizing priority queue
 
-## .NET Nuget Package dependencies
-
-Use the following nuget packages and versions
-- `Azure.AI.Inference`. **Important** use version `1.0.0-beta.5`
-- `Microsoft.Azure.Cosmos` . **Important** use version `3.56.0`
-- `Newtonsoft.Json`. **Important** use version `13.0.4`
-- `Microsoft.Extensions.Logging.Abstractions`. **Important** use version `9.0.0`
 
 
 ## Code Style Guidelines
@@ -164,7 +157,16 @@ Containers:
 - PartsInventory (partition key: category)
 - WorkOrders (partition key: status)
 
-## Environment Variable names
+## .NET Nuget Package dependencies
+
+These are the preferred nuget package versions to use
+- `Azure.AI.Inference`. **Important** use version `1.0.0-beta.5`
+- `Microsoft.Azure.Cosmos` . **Important** use version `3.56.0`
+- `Newtonsoft.Json`. **Important** use version `13.0.4`
+- `Microsoft.Extensions.Logging`. **Important** use version `9.0.0`
+- `Microsoft.Extensions.Logging.Abstractions`. **Important** use version `9.0.0`
+
+## Environment Variable naming conventions 
 - COSMOS_ENDPOINT
 - COSMOS_KEY 
 - COSMOS_DATABASE_NAME
@@ -195,6 +197,56 @@ Machine: {fault.MachineId}
 Fault: {fault.FaultType}
 Available resources: {JsonSerializer.Serialize(resources)}";
 ```
+
+### AI Foundry ChatCompletions (Azure.AI.Inference `1.0.0-beta.5`) — preferred pattern
+
+This repo pins `Azure.AI.Inference` to `1.0.0-beta.5`. Many Copilot-generated samples accidentally mix this with `Azure.AI.OpenAI` (or older previews), which changes:
+- client type names (`ChatCompletionsClient` vs `ChatCompletionClient`/`ChatClient`)
+- how the deployment/model is specified
+- how you read content from the response
+
+When generating code for this repo, prefer this exact pattern:
+
+```csharp
+using Azure;
+using Azure.AI.Inference;
+
+// 1) Create the client with endpoint + key
+var client = new ChatCompletionsClient(new Uri(aiFoundryEndpoint), new AzureKeyCredential(aiFoundryKey));
+
+// 2) Build options + messages
+var options = new ChatCompletionsOptions
+{
+    Temperature = 0.2f,
+    MaxTokens = 1200,
+};
+
+options.Messages.Add(new ChatRequestSystemMessage(systemPrompt));
+options.Messages.Add(new ChatRequestUserMessage(userPrompt));
+
+// 3) IMPORTANT: pass the deployment/model name
+// Preferred (if available): pass it as the first argument.
+Response<ChatCompletions> response = await client.CompleteAsync(
+    aiModelDeploymentName,
+    options,
+    cancellationToken);
+
+// 4) Read the content
+// In this SDK/version, Content is exposed directly.
+string content = response.Value.Content;
+```
+
+If you see a compile error because `CompleteAsync(string, ChatCompletionsOptions, ...)` is not found, use the overload that exists in that version and set the model/deployment on the options instead (some variants use `options.Model`):
+
+```csharp
+options.Model = aiModelDeploymentName;
+Response<ChatCompletions> response = await client.CompleteAsync(options, cancellationToken);
+```
+
+Common “wrong version” signals (fix by ensuring `using Azure.AI.Inference;` and the package is `Azure.AI.Inference` `1.0.0-beta.5`):
+- You’re using `ChatCompletionClient` (singular) instead of `ChatCompletionsClient`.
+- The response shape doesn’t have `response.Value.Content` and instead forces `Choices[0].Message.Content`.
+- The options/message types are missing (`ChatCompletionsOptions`, `ChatRequestSystemMessage`, `ChatRequestUserMessage`).
 
 ## Maintenance-Specific Knowledge
 
