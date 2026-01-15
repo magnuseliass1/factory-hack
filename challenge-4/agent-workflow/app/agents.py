@@ -10,6 +10,7 @@ from agent_framework.azure import AzureAIAgentClient
 from azure.identity.aio import DefaultAzureCredential
 
 # Add challenge-3 agents to the Python path for in-place imports
+# This path is relative to this file's location: challenge-4/agent-workflow/app -> challenge-3/agents
 CHALLENGE_3_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "challenge-3", "agents"))
 if CHALLENGE_3_PATH not in sys.path:
     sys.path.insert(0, CHALLENGE_3_PATH)
@@ -78,7 +79,7 @@ def create_maintenance_scheduler_a2a_app():
                     cosmos_service = CosmosDbService(cosmos_endpoint, cosmos_key, database_name)
                     agent = MaintenanceSchedulerAgent(project_endpoint, deployment_name, cosmos_service)
 
-                    # Parse work order ID from input
+                    # Parse work order ID from input (default matches challenge-3 maintenance_scheduler_agent.py)
                     work_order_id = input_text.strip() if input_text else "wo-2024-468"
 
                     # Get work order and run prediction
@@ -178,7 +179,7 @@ def create_parts_ordering_a2a_app():
                     cosmos_service = CosmosDbService(cosmos_endpoint, cosmos_key, database_name)
                     agent = PartsOrderingAgent(project_endpoint, deployment_name, cosmos_service)
 
-                    # Parse work order ID from input
+                    # Parse work order ID from input (default matches challenge-3 parts_ordering_agent.py)
                     work_order_id = input_text.strip() if input_text else "2024-468"
 
                     # Get work order and generate order
