@@ -14,6 +14,7 @@ import telemetry
 from pydantic import BaseModel
 from agents import run_factory_workflow, create_maintenance_scheduler_a2a_app, create_parts_ordering_a2a_app
 from agent_framework.observability import configure_otel_providers
+from dotenv import load_dotenv
 
 
 @contextlib.asynccontextmanager
@@ -23,7 +24,22 @@ async def lifespan(app):
     yield
 
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+load_dotenv()
+
 app = fastapi.FastAPI(lifespan=lifespan)
+
+# Add middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: fastapi.Request, call_next):
+    logger.info(f">>> Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"<<< Response: {request.method} {request.url.path} - Status: {response.status_code}")
+    return response
+
 otel_fastapi.FastAPIInstrumentor.instrument_app(app, exclude_spans=["send"])
 
 # =============================================================================
@@ -41,12 +57,9 @@ try:
 
     app.mount("/maintenance-scheduler", maintenance_scheduler_starlette)
     app.mount("/parts-ordering", parts_ordering_starlette)
+    logger.info("A2A agents mounted successfully at /maintenance-scheduler and /parts-ordering")
 except Exception as e:
-    logging.getLogger(__name__).warning(f"Failed to initialize A2A agents: {e}")
-
-
-
-logger = logging.getLogger(__name__)
+    logger.warning(f"Failed to initialize A2A agents: {e}")
 
 
 if not os.path.exists("static"):

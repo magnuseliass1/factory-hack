@@ -15,8 +15,17 @@ CHALLENGE_3_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 if CHALLENGE_3_PATH not in sys.path:
     sys.path.insert(0, CHALLENGE_3_PATH)
 
-load_dotenv(override=True)
+# Load .env from workspace root to get COSMOS and AI_FOUNDRY credentials
+WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+ENV_FILE = os.path.join(WORKSPACE_ROOT, ".env")
+loaded = load_dotenv(ENV_FILE, override=True)
 logger = logging.getLogger(__name__)
+
+# Debug: Log env loading status
+logger.info(f"Loading env from: {ENV_FILE} (exists: {os.path.exists(ENV_FILE)}, loaded: {loaded})")
+logger.info(f"COSMOS_ENDPOINT set: {bool(os.getenv('COSMOS_ENDPOINT'))}")
+logger.info(f"COSMOS_DATABASE set: {bool(os.getenv('COSMOS_DATABASE'))}")
+logger.info(f"AI_FOUNDRY_PROJECT_ENDPOINT set: {bool(os.getenv('AI_FOUNDRY_PROJECT_ENDPOINT'))}")
 
 
 # =============================================================================
@@ -32,10 +41,14 @@ def create_maintenance_scheduler_a2a_app():
     from a2a.server.tasks import InMemoryTaskStore
     from a2a.types import AgentCard, AgentCapabilities, AgentSkill, TextPart, Message
 
+    # Get the base URL from environment or use default
+    # The URL should point to where this agent's RPC endpoint is accessible
+    default_url = os.getenv("MAINTENANCE_SCHEDULER_AGENT_SELF_URL", "http://localhost:8000/maintenance-scheduler/")
+    
     agent_card = AgentCard(
         name="MaintenanceSchedulerAgent",
         description="Predictive maintenance scheduling agent that analyzes work orders, historical maintenance data, and available windows to recommend optimal maintenance schedules.",
-        url="",  # Will be set dynamically
+        url=default_url,
         version="1.0.0",
         capabilities=AgentCapabilities(streaming=False, pushNotifications=False),
         defaultInputModes=["text"],
@@ -58,10 +71,10 @@ def create_maintenance_scheduler_a2a_app():
             from services.cosmos_db_service import CosmosDbService
 
             try:
-                # Extract the message text
-                request = context.request
-                if request and request.message and request.message.parts:
-                    text_parts = [p for p in request.message.parts if isinstance(p, TextPart)]
+                # Extract the message text from context.message
+                message = context.message
+                if message and message.parts:
+                    text_parts = [p for p in message.parts if isinstance(p, TextPart)]
                     input_text = text_parts[0].text if text_parts else ""
                 else:
                     input_text = ""
@@ -69,7 +82,7 @@ def create_maintenance_scheduler_a2a_app():
                 # Initialize services
                 cosmos_endpoint = os.getenv("COSMOS_ENDPOINT")
                 cosmos_key = os.getenv("COSMOS_KEY")
-                database_name = os.getenv("COSMOS_DATABASE_NAME")
+                database_name = os.getenv("COSMOS_DATABASE_NAME") or os.getenv("COSMOS_DATABASE")
                 project_endpoint = os.getenv("AI_FOUNDRY_PROJECT_ENDPOINT") or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
                 deployment_name = os.getenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
 
@@ -106,8 +119,10 @@ def create_maintenance_scheduler_a2a_app():
                 logger.exception("MaintenanceSchedulerAgent error")
                 response_text = f"Error processing maintenance schedule request: {str(e)}"
 
-            # Send response
+            # Send response - messageId is required by A2A protocol
+            import uuid
             response_message = Message(
+                messageId=str(uuid.uuid4()),
                 role="agent",
                 parts=[TextPart(text=response_text)],
             )
@@ -132,10 +147,14 @@ def create_parts_ordering_a2a_app():
     from a2a.server.tasks import InMemoryTaskStore
     from a2a.types import AgentCard, AgentCapabilities, AgentSkill, TextPart, Message
 
+    # Get the base URL from environment or use default
+    # The URL should point to where this agent's RPC endpoint is accessible
+    default_url = os.getenv("PARTS_ORDERING_AGENT_SELF_URL", "http://localhost:8000/parts-ordering/")
+
     agent_card = AgentCard(
         name="PartsOrderingAgent",
         description="Parts ordering agent that analyzes inventory status and generates optimized parts orders from suppliers.",
-        url="",  # Will be set dynamically
+        url=default_url,
         version="1.0.0",
         capabilities=AgentCapabilities(streaming=False, pushNotifications=False),
         defaultInputModes=["text"],
@@ -158,10 +177,10 @@ def create_parts_ordering_a2a_app():
             from services.cosmos_db_service import CosmosDbService
 
             try:
-                # Extract the message text
-                request = context.request
-                if request and request.message and request.message.parts:
-                    text_parts = [p for p in request.message.parts if isinstance(p, TextPart)]
+                # Extract the message text from context.message
+                message = context.message
+                if message and message.parts:
+                    text_parts = [p for p in message.parts if isinstance(p, TextPart)]
                     input_text = text_parts[0].text if text_parts else ""
                 else:
                     input_text = ""
@@ -169,7 +188,7 @@ def create_parts_ordering_a2a_app():
                 # Initialize services
                 cosmos_endpoint = os.getenv("COSMOS_ENDPOINT")
                 cosmos_key = os.getenv("COSMOS_KEY")
-                database_name = os.getenv("COSMOS_DATABASE_NAME")
+                database_name = os.getenv("COSMOS_DATABASE_NAME") or os.getenv("COSMOS_DATABASE")
                 project_endpoint = os.getenv("AI_FOUNDRY_PROJECT_ENDPOINT") or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
                 deployment_name = os.getenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
 
@@ -218,8 +237,10 @@ def create_parts_ordering_a2a_app():
                 logger.exception("PartsOrderingAgent error")
                 response_text = f"Error processing parts order request: {str(e)}"
 
-            # Send response
+            # Send response - messageId is required by A2A protocol
+            import uuid
             response_message = Message(
+                messageId=str(uuid.uuid4()),
                 role="agent",
                 parts=[TextPart(text=response_text)],
             )

@@ -128,17 +128,11 @@ static async Task<IResult> AnalyzeMachine(
         var agents = new List<AIAgent> { anomalyClassificationAgent, faultDiagnosisAgent };
 
         // Add A2A agents from Python app if URLs are configured
-        var httpClient = httpClientFactory.CreateClient();
-
         var maintenanceSchedulerUrl = config["MAINTENANCE_SCHEDULER_AGENT_URL"];
         if (!string.IsNullOrEmpty(maintenanceSchedulerUrl))
         {
-            var maintenanceSchedulerAgent = Workflow.CreateA2AAgent(
-                httpClient, maintenanceSchedulerUrl,
-                id: "maintenance-scheduler",
-                name: "MaintenanceSchedulerAgent",
-                description: "Predictive maintenance scheduling agent from challenge-3",
-                loggerFactory);
+            var cardResolver = new A2ACardResolver(new Uri(maintenanceSchedulerUrl + "/"));
+            var maintenanceSchedulerAgent = await cardResolver.GetAIAgentAsync();
             agents.Add(maintenanceSchedulerAgent);
             Console.WriteLine($"A2A Agent added: {maintenanceSchedulerAgent.Name} at {maintenanceSchedulerUrl}");
         }
@@ -146,12 +140,8 @@ static async Task<IResult> AnalyzeMachine(
         var partsOrderingUrl = config["PARTS_ORDERING_AGENT_URL"];
         if (!string.IsNullOrEmpty(partsOrderingUrl))
         {
-            var partsOrderingAgent = Workflow.CreateA2AAgent(
-                httpClient, partsOrderingUrl,
-                id: "parts-ordering",
-                name: "PartsOrderingAgent",
-                description: "Parts ordering agent from challenge-3",
-                loggerFactory);
+            var cardResolver = new A2ACardResolver(new Uri(partsOrderingUrl + "/"));
+            var partsOrderingAgent = await cardResolver.GetAIAgentAsync();
             agents.Add(partsOrderingAgent);
             Console.WriteLine($"A2A Agent added: {partsOrderingAgent.Name} at {partsOrderingUrl}");
         }
@@ -266,14 +256,5 @@ static class Workflow
         }
 
         return body;
-    }
-
-    /// <summary>
-    /// Helper method to create an A2A agent from a URL
-    /// </summary>
-    internal static A2AAgent CreateA2AAgent(HttpClient httpClient, string url, string id, string name, string description, ILoggerFactory loggerFactory)
-    {
-        var a2aClient = new A2AClient(new Uri(url), httpClient);
-        return new A2AAgent(a2aClient, id, name, description, loggerFactory);
     }
 }

@@ -7,23 +7,25 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 
 #pragma warning disable ASPIRECSHARPAPPS001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-var dotnetapp = builder.AddCSharpApp("dotnetagent", "./a2a/dotnetagent.csproj")
-    .WithExternalHttpEndpoints()
-    .WithEnvironment("SSL_CERT_DIR", "/etc/ssl/certs")
-    .WithEnvironment("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
-    .WithHttpHealthCheck("/health");
+
 var app = builder.AddUvicornApp("app", "./app", "main:app")
     .WithUv()
-    .WithEnvironment("REPAIR_PLANNER_AGENT_URL", dotnetapp.GetEndpoint("https"))
-    .WithHttpEndpoint(port: 8000, env: "UVICORN_PORT", name: "api")
+    //.WithEnvironment("REPAIR_PLANNER_AGENT_URL", dotnetapp.GetEndpoint("https"))
+    .WithArgs("--host", "0.0.0.0", "--port", "8000")
+    .WithHttpsEndpoint(port: 8000, name: "api", isProxied: false)
     .WithExternalHttpEndpoints()
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health", endpointName: "api");
+
+var appApiEndpoint = app.GetEndpoint("api");
 
 var dotnetworkflow = builder.AddCSharpApp("dotnetworkflow", "./dotnetworkflow/FactoryWorkflow.csproj")
     .WithExternalHttpEndpoints()
     // .WithEnvironment("SSL_CERT_DIR", "/etc/ssl/certs")
-    .WithHttpEndpoint(port:8001, env: "DOTNETWORKFLOW_PORT", name: "api")
+   // .WithHttpEndpoint(port:8001, env: "DOTNETWORKFLOW_PORT", name: "api")
     .WithEnvironment("SSL_CERT_FILE", "/etc/ssl/certs/ca-certificates.crt")
+    .WithReference(app)
+    .WithEnvironment("MAINTENANCE_SCHEDULER_AGENT_URL", ReferenceExpression.Create($"{appApiEndpoint}/maintenance-scheduler"))
+    .WithEnvironment("PARTS_ORDERING_AGENT_URL", ReferenceExpression.Create($"{appApiEndpoint}/parts-ordering"))
     .WithHttpHealthCheck("/health");
 #pragma warning restore ASPIRECSHARPAPPS001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 // Use the externally reachable HTTP endpoint for the frontend (Aspire also creates an internal/proxied endpoint).
