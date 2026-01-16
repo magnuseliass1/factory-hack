@@ -253,11 +253,12 @@ export $(cat ../.env | xargs)
 ```
 
 > [!TIP]
-> Keep your `.env` file handy throughout the hackathon. Add it to `.gitignore` to avoid committing secrets!
-> You need to re-export the variables each time you open a new shell or when you resume a stopped Codespace.
+> Keep your `.env` file handy throughout the hackathon. 
+> You need to re-export the environment variables each time you open a new shell or when you resume a stopped Codespace.
 
 > [!CAUTION]
->For convenience we will use key-based authentication and public network access to resources in the hack. In real world implementations you should consider stronger authentication mechanisms and additional network security.
+> For convenience we will use key-based authentication and public network access to resources in the hack. In real world implementations you should consider stronger authentication mechanisms and additional network security.
+> Never commit the .env file to the repository. This repo already includes `.env` in [.gitignore](../.gitignore), but if you rename the file you may need to add the new name to [.gitignore](../.gitignore) as well.
 
 ---
 
