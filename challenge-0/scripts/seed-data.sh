@@ -234,6 +234,7 @@ python3 seed_blob_wiki.py
 
 # Clean up uploader script
 rm seed_blob_wiki.py
+echo "COSMOS_DATABASE=\"FactoryOpsDB\"" >> ../.env
 
 echo "✅ Blob upload complete!"
 
