@@ -8,6 +8,7 @@ using System.Text;
 
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.AzureAI;
+using Microsoft.Agents.AI.A2A;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -21,11 +22,22 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+using A2A;
+
 DotNetEnv.Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient();
+// Dev/Codespaces: allow the Vite frontend (different origin) to call this API.
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
 builder.Configuration.AddEnvironmentVariables();
 
 var configuration = builder.Configuration;
@@ -58,6 +70,9 @@ builder.Services.AddSingleton(sp =>
     return new AIProjectClient(new Uri(endpoint), new DefaultAzureCredential());
 });
 
+// Register LoggerFactory for A2A agents
+builder.Services.AddSingleton<ILoggerFactory>(sp => LoggerFactory.Create(b => b.AddConsole()));
+
 var appInsightsConnectionString = configuration["ApplicationInsights:ConnectionString"];
 
 var tracerProviderBuilder = Sdk.CreateTracerProviderBuilder()
@@ -65,6 +80,7 @@ var tracerProviderBuilder = Sdk.CreateTracerProviderBuilder()
     .AddSource(SourceName, "ChatClient") // Our custom activity source(s)
     .AddSource("Microsoft.Agents.AI*") // Agent Framework telemetry
     .AddSource("AnomalyClassificationAgent", "FaultDiagnosisAgent", "RepairPlannerAgent") // Our agents
+    .AddSource("MaintenanceSchedulerAgent", "PartsOrderingAgent") // A2A agents from challenge-3
     .AddAspNetCoreInstrumentation() // Capture incoming HTTP requests
     .AddHttpClientInstrumentation() // Capture HTTP calls to OpenAI
     .AddOtlpExporter();
@@ -82,6 +98,7 @@ else
 using var tracerProvider = tracerProviderBuilder.Build();
 
 var app = builder.Build();
+app.UseCors();
 app.MapPost("/api/analyze_machine", AnalyzeMachine);
 app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTimeOffset.UtcNow }));
 app.Run();
@@ -91,6 +108,7 @@ static async Task<IResult> AnalyzeMachine(
     AIProjectClient projectClient,
     IHttpClientFactory httpClientFactory,
     IConfiguration config,
+    ILoggerFactory loggerFactory,
     ILogger<Program> logger)
 {
     logger.LogInformation("Starting analysis for machine {MachineId}", request.machine_id);
@@ -103,11 +121,32 @@ static async Task<IResult> AnalyzeMachine(
         Console.WriteLine($"Agent retrieved (name: {faultDiagnosisAgent.Name}, id: {faultDiagnosisAgent.Id})");
         Console.WriteLine($"Agent retrieved (name: {anomalyClassificationAgent.Name}, id: {anomalyClassificationAgent.Id})");
         
-        var telemetryJson = request.telemetry.ValueKind == JsonValueKind.Undefined
-            ? string.Empty
-            : request.telemetry.GetRawText();
+        var telemetryJson = JsonSerializer.Serialize(request);
+        Console.WriteLine($"Telemetry JSON: {telemetryJson}");
 
-        var workflow = AgentWorkflowBuilder.BuildSequential(anomalyClassificationAgent, faultDiagnosisAgent);
+        // Create list of agents for the workflow
+        var agents = new List<AIAgent> { anomalyClassificationAgent, faultDiagnosisAgent };
+
+        // Add A2A agents from Python app if URLs are configured
+        var maintenanceSchedulerUrl = config["MAINTENANCE_SCHEDULER_AGENT_URL"];
+        if (!string.IsNullOrEmpty(maintenanceSchedulerUrl))
+        {
+            var cardResolver = new A2ACardResolver(new Uri(maintenanceSchedulerUrl + "/"));
+            var maintenanceSchedulerAgent = await cardResolver.GetAIAgentAsync();
+            agents.Add(maintenanceSchedulerAgent);
+            Console.WriteLine($"A2A Agent added: {maintenanceSchedulerAgent.Name} at {maintenanceSchedulerUrl}");
+        }
+
+        var partsOrderingUrl = config["PARTS_ORDERING_AGENT_URL"];
+        if (!string.IsNullOrEmpty(partsOrderingUrl))
+        {
+            var cardResolver = new A2ACardResolver(new Uri(partsOrderingUrl + "/"));
+            var partsOrderingAgent = await cardResolver.GetAIAgentAsync();
+            agents.Add(partsOrderingAgent);
+            Console.WriteLine($"A2A Agent added: {partsOrderingAgent.Name} at {partsOrderingUrl}");
+        }
+
+        var workflow = AgentWorkflowBuilder.BuildSequential(agents.ToArray());
         var result = new List<Microsoft.Extensions.AI.ChatMessage>();
 
         var run = await InProcessExecution.RunAsync(workflow, telemetryJson);
@@ -116,14 +155,30 @@ static async Task<IResult> AnalyzeMachine(
         {
             if (evt is AgentRunUpdateEvent e)
             {
-                // if (e.Update.Contents.OfType<FunctionCallContent>().FirstOrDefault() is FunctionCallContent call)
-                // {
-                //     logger.LogInformation(
-                //         "Calling function '{CallName}' with arguments: {Args}",
-                //         call.Name,
-                //         JsonSerializer.Serialize(call.Arguments));
-                // }
+                if (e.Update.Contents.OfType<FunctionCallContent>().FirstOrDefault() is FunctionCallContent call)
+                {
+                    logger.LogInformation(
+                        "Calling function '{CallName}' with arguments: {Args}",
+                        call.Name,
+                        JsonSerializer.Serialize(call.Arguments));
+                }
+#pragma warning disable MEAI001 // Evaluation-only API; suppress to allow compilation.
+                else if (e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolCallContent>().FirstOrDefault() is McpServerToolCallContent mcpCall)
+                {
+                    logger.LogInformation(
+                        "Calling function '{CallName}' with arguments: {Args}",
+                        mcpCall.ToolName,
+                        JsonSerializer.Serialize(mcpCall.Arguments));
+                }
+                else if(e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolResultContent>().FirstOrDefault() is McpServerToolResultContent mcpCallResult)
+                {
+                    logger.LogInformation(
+                        "Function result: {Message}",
+                        mcpCallResult.Output);
+                }
+#pragma warning restore MEAI001
             }
+            
             else if (evt is WorkflowOutputEvent output)
             {
                 Console.WriteLine(evt.Data);
