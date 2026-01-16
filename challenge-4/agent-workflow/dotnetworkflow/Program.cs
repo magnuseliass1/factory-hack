@@ -24,6 +24,9 @@ using OpenTelemetry.Trace;
 
 using A2A;
 
+using FactoryWorkflow.RepairPlanner;
+using FactoryWorkflow.RepairPlanner.Services;
+
 DotNetEnv.Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -144,6 +147,44 @@ static async Task<IResult> AnalyzeMachine(
             var partsOrderingAgent = await cardResolver.GetAIAgentAsync();
             agents.Add(partsOrderingAgent);
             Console.WriteLine($"A2A Agent added: {partsOrderingAgent.Name} at {partsOrderingUrl}");
+        }
+
+        // Create RepairPlanner agent with Cosmos DB tools
+        var aoaiEndpoint = config["AZURE_OPENAI_ENDPOINT"];
+        var aoaiDeployment = config["AZURE_OPENAI_DEPLOYMENT_NAME"] ?? "gpt-4o";
+        var cosmosEndpoint = config["COSMOS_ENDPOINT"];
+        var cosmosKey = config["COSMOS_KEY"];
+        var cosmosDatabase = config["COSMOS_DATABASE"] ?? "FactoryOpsDB";
+        
+        if (!string.IsNullOrEmpty(aoaiEndpoint))
+        {
+            try
+            {
+                // Create Cosmos DB service for the tools (if configured)
+                CosmosDbService? cosmosService = null;
+                if (!string.IsNullOrEmpty(cosmosEndpoint) && !string.IsNullOrEmpty(cosmosKey))
+                {
+                    cosmosService = new CosmosDbService(
+                        cosmosEndpoint, cosmosKey, cosmosDatabase,
+                        loggerFactory.CreateLogger<CosmosDbService>());
+                    Console.WriteLine("CosmosDbService created for RepairPlannerAgent tools");
+                }
+                
+                var repairPlannerAgent = RepairPlannerAgentFactory.Create(
+                    aoaiEndpoint, aoaiDeployment, cosmosService, loggerFactory);
+                
+                // Insert after FaultDiagnosis (position 2, index 2)
+                agents.Insert(2, repairPlannerAgent);
+                Console.WriteLine($"RepairPlannerAgent created at {aoaiEndpoint}");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not create RepairPlannerAgent - skipping");
+            }
+        }
+        else
+        {
+            logger.LogWarning("AZURE_OPENAI_ENDPOINT not configured - RepairPlannerAgent will be skipped");
         }
 
         var workflow = AgentWorkflowBuilder.BuildSequential(agents.ToArray());
