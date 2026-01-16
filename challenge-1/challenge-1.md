@@ -21,7 +21,7 @@ The following drawing illustrates the part of the architecture we will implement
 
 [TODO: add image with Anomaly Classification Agent and Fault Diagnosis Agent highlighted]
 [TODO: add explanation of MCP and Foundry IQ]
-
+[TODO: add explanation of AI Gateway]
 Build an agent that:
 
 - Monitors telemetry in real-time
@@ -246,7 +246,10 @@ Verify the answer from the agent
 
 ## 🛠️ Troubleshooting and FAQ
 
-- [TODO: add info on delay before agent changes shows up]
+<details>
+<summary>Problem: the agent doesn't show up in the new Foundry Portal</summary>
+There is a certain delay before newly created agents are visible in the Foundry Portal. If you don't see the agent after 10 minutes, try refreshing the browser or run the Python script again.
+</details>
 
 ## 🧠 Conclusion and reflection
 
