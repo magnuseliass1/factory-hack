@@ -98,7 +98,7 @@ curl -fsSL "$APIM_GATEWAY_URL/maintenance/tire_curing_press" -H "Ocp-Apim-Subscr
 API Management provides an easy way to expose APIs as MCP servers without writing any additional wrapper code.
 
 1. Navigate to your API Management instance in the [Azure portal](https://portal.azure.com).
-2. Choose _APIs_ and notice that _Machine API_ you tested earlier is available
+2. Choose _APIs_ and notice that _Machine API_ and _Maintenance API_ you tested earlier is available
 3. Navigate to the _MCP Servers_ section
 4. Click _Create MCP Server_ and _Expose an API as MCP Server_
 5. Select API, operations and provide the following details
@@ -224,9 +224,6 @@ Currently only one tool `machine_data` is available. Your task is to add the kno
         allowed_tools=["knowledge_base_retrieve"],
     )
     ```
-
-> [!TIP]
-> The tools property is a list so make sure you have a trailing comma after the first tool
 
 A few things to observe:
 
