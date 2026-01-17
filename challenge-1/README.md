@@ -2,44 +2,52 @@
 
 Welcome to Challenge 1!
 
-In this challenge, we will build two specialized agents for classifying and understanding machine anomalies. First we'll develop an **Anomaly Classification Agent** to interpret detected anomalies and raise corresponding maintenance alerts. We'll then implement a **Fault Diagnosis Agent** to determine the root cause of the anomaly to enable preparation for maintenance. The agents will use a number of different tools to accomplish their tasks.
+In this challenge, we will build two specialized agents for classifying and understanding machine anomalies.
 
 **Expected duration**: 60 min
-**Prerequisites**: [Challenge 0](../challenge-0/challenge-0.md) successfully completed
+**Prerequisites**: [Challenge 0](../challenge-0/README.md) successfully completed
 
 ## 🎯 Objective
 
-- Create Foundry Agents in Python
+- Create two Foundry Agents in Python
 - Use MCP servers for remote tool invocation
-- Learn how Foundry IQ can be used to ground agents in your own data
+- Learn how Foundry IQ can be used to ground agents with your own data
 
 ## 🧭 Context and background information
 
-[TODO: add business context]
+![Challenge 1 scenario](./images/challenge-1-scenario.png)
+First, we’ll develop an **Anomaly Classification Agent** to interpret detected anomalies and raise corresponding maintenance alerts. Next, we’ll implement a **Fault Diagnosis Agent** to determine the root cause of an anomaly so you can prepare for maintenance. The agents will use a number of different tools to accomplish their tasks.
 
-The following drawing illustrates the part of the architecture we will implement in this challenge
+You will use the Azure resources highlighted in the image below.
+![Challenge 1 Azure Resources](./images/challenge-1-azure-resources.png)
+The following drawing illustrates the part of the architecture we will implement in this challenge.
 
-[TODO: add image with Anomaly Classification Agent and Fault Diagnosis Agent highlighted]
-[TODO: add explanation of MCP and Foundry IQ]
-[TODO: add explanation of AI Gateway]
-Build an agent that:
+### Model Context Protocol (MCP)
 
-- Monitors telemetry in real-time
-- Compares readings against thresholds
-- Detects warning and critical conditions
-- Triggers diagnostic workflow
+You will also use **Model Context Protocol (MCP)** to connect the agents with remote tools.
 
-**You'll work with:**
+MCP is a standard way for an agent to discover and invoke external capabilities ("tools") through a consistent interface. In this challenge, those tools live behind **remote MCP servers** (for example, MCP servers created from API Management operations).
 
-- The 5 warning telemetry samples already seeded
-- The threshold definitions for each machine type
-- Microsoft Foundry for intelligent analysis
+Why we use it here:
+
+- **Decouples the agent from integrations**: the agent calls a tool by name and schema, not by hardcoding HTTP requests.
+- **Reusable + portable**: the same agent code can work across environments as long as the MCP server URL/connection is configured.
+- **Governance hooks**: tools can be allow-listed and can require (or skip) approval depending on your scenario.
+
+### Grounding with Foundry IQ
+
+You will also ground the agent with data using **Foundry IQ**.
+
+Foundry IQ is a managed knowledge base (an agentic retrieval workload powered by Azure AI Search) that lets your agent retrieve relevant chunks from your own documents at runtime. Instead of pasting wiki content into prompts, the agent issues targeted retrieval requests and uses the returned passages to produce answers that stay aligned with your source material.
+
+In this challenge, we’ll use Foundry IQ to make the **machine wiki** available to the Fault Diagnosis Agent via an MCP tool.
+
 
 ## ✅ Tasks
 
 ### Task 1: Create and test initial Anomaly Classification Agent
 
-As a first step we will create an agent to interpret and classify anomalies and raise maintenance alerts if certain thresholds have been violated. The agent will take anomalies for certain machines as input and check against thresholds for that machine type by using json data stored in Cosmos DB.
+As a first step, we will create an agent to interpret and classify anomalies and raise maintenance alerts if certain thresholds have been violated. The agent will take anomalies for specific machines as input and check them against thresholds for that machine type by using JSON data stored in Cosmos DB.
 
 ---
 
@@ -52,7 +60,7 @@ A few things to observe:
   - `get_thresholds`: Retrieves specific metric threshold values for certain machine types.
   - `get_machine_data`: Fetches details about machines such as id, model and maintenance history.
 - The agent is instructed to output both structured alert data in a specific format and a human readable summary.
-- The code will both create the agent and run a sample query aginst it.
+- The code will create the agent and run a sample query against it.
 
 ---
 
@@ -64,25 +72,23 @@ python agents/anomaly_classification_agent.py
 
 ```
 
-Verify that the agent responed with a reasonable answer.
+Verify that the agent responded with a reasonable answer.
 
 ---
 
-### Task 2 : Equip the agent with MCP tools
+### Task 2: Equip the agent with MCP tools
 
 Machine and threshold information is typically stored in a central system and exposed through an API. Let's adjust the data access to use an existing Machine and Maintenance APIs instead of accessing a Cosmos DB database directly. In this step you will expose the Machine and Maintenance APIs as Model Context Protocol (MCP) servers for convenient access from the Agent.
-
-> [!NOTE]
-> The Model Context Protocol (MCP) is a standardized way for AI models and systems to communicate context and metadata about their operations. It allows different components of an AI ecosystem to share information seamlessly, enabling better coordination and integration.
 
 ---
 
 #### Task 2.1. Test the Machine API
 
-The Machine API and Maintance APIs are already available in API Management and contains endpoints for getting details about a specific machine and thresholds for certain machine types. Try the APIs using the following commands
+The Machine API and Maintenance API are already available in API Management and contain endpoints for getting details about a specific machine and thresholds for certain machine types. Try the APIs using the following commands:
 
 ```bash
 # Get all machines
+curl -fsSL "$APIM_GATEWAY_URL/machine" -H "Ocp-Apim-Subscription-Key: $APIM_SUBSCRIPTION_KEY" -H "Accept: application/json"
 
 # Get a specific machine
 curl -fsSL "$APIM_GATEWAY_URL/machine/machine-001" -H "Ocp-Apim-Subscription-Key: $APIM_SUBSCRIPTION_KEY" -H "Accept: application/json"
@@ -110,7 +116,7 @@ API Management provides an easy way to expose APIs as MCP servers without writin
 6. Click _Create_
 7. Finally, save the _MCP Server URL_ of the newly created MCP server, you will need it in the next part. Add a new entry with the value in the _.env_ file `MACHINE_MCP_SERVER_ENDPOINT=<MCP_SERVER_URL>`
 
-Peform the same steps to create the _Maintenance_ MCP server using the following settings
+Perform the same steps to create the _Maintenance_ MCP server using the following settings:
 
 - **API**: _Maintenance API_
 - **API Operations**: _Get Threshold_
@@ -130,9 +136,7 @@ export $(cat ../.env | xargs)
 
 #### Task 2.3. Use the MCP Servers from the agent
 
-Now its time to replace the direct database access with our new Machine and Maintenance MCP Servers. The MCP servers will be added as as tools to the Anomaly Classification Agent.
-
-[TBD: Do this as a manual exercise and use the UI to configure everyting?]
+Now it’s time to replace the direct database access with our new Machine and Maintenance MCP Servers. The MCP servers will be added as tools to the Anomaly Classification Agent.
 
 Examine the Python code in [anomaly_classification_agent_mcp.py](./agents/anomaly_classification_agent_mcp.py)  
 A few things to observe:
@@ -154,6 +158,7 @@ python agents/anomaly_classification_agent_mcp.py
 ```
 
 Verify that the agent responed with a correct answer.
+Verify that the agent responded with a correct answer.
 
 ---
 
@@ -171,6 +176,7 @@ Verify that the agent responed with a correct answer.
 - Normal condition (no maintenance needed). Use query `Hello, can you classify the following metric for machine-002: [{"metric": "drum_vibration", "value": 2.1}]`
 - Critical anomaly. Use query `Hello, can you classify the following metric for machine-005: [{"metric": "mixing_temperature", "value": 175}]`
 - Non existing machine. Use query `Hello, can you classify the following anomalies for machine-007: [{"metric": "curing_temperature", "value": 179.2},{"metric": "cycle_time", "value": 14.5}]`
+- Non-existent machine. Use query `Hello, can you classify the following anomalies for machine-007: [{"metric": "curing_temperature", "value": 179.2},{"metric": "cycle_time", "value": 14.5}]`
 
 ---
 
@@ -178,17 +184,13 @@ Verify that the agent responed with a correct answer.
 
 The next agent we'll create, **Fault Diagnosis Agent**, is tasked to understand the actual root cause of the issues alerted from the **Anomaly Classification Agent**. Besides machine data and maintenance history we'll add a machine wiki as a tool for the agent by leveraging **Foundry IQ**.
 
-> [!NOTE]
-> Foundry IQ is an agentic retrieval workload powered by Azure AI Search that defines a reusable knowledge base around a topic.
-> An agent connects to Foundry IQ using Model Context Protocol (MCP) to facilitate tool calls.
-
 #### Task 3.1. Examine the machine data wiki
 
 The machine wiki contains knowledge (common issues, repair instructions and repair details) about different machine types. The wiki pages are available as markdown files in **Azure Blob Storage**. Take a moment to review the content:
 
 1. Navigate to [Azure Portal](https://portal.azure.com) and locate the storage account.
 2. Select _Storage browser_ / _Blob containers_ and select the _machine-wiki_ container  
-3. Select a wiki article and selecte the _edit_ tab to preview the content
+3. Select a wiki article and select the _Edit_ tab to preview the content
 
 ---
 
@@ -203,7 +205,7 @@ Create a knowledge source and knowledge base using the [create_knowledge_base.ip
 
 ---
 
-#### Task 3.4. Create the Fault Diagnosis Agent
+#### Task 3.3. Create the Fault Diagnosis Agent
 
 Let's create the **Fault Diagnosis Agent** and use our newly created Foundry IQ knowledge base.
 
@@ -232,7 +234,7 @@ A few things to observe:
   - `machine_data`: Fetches details about machines such as id, model and maintenance history.
 - The agent is clearly instructed to use our machine knowledge base instead of its own knowledge.
 
-Run the code
+Run the code:
 
 ```bash
 python agents/fault_diagnosis_agent.py 
@@ -245,22 +247,48 @@ Verify the answer from the agent
 
 <details>
 <summary>Problem: the agent doesn't show up in the new Foundry Portal</summary>
-There is a certain delay before newly created agents are visible in the Foundry Portal. If you don't see the agent after 10 minutes, try refreshing the browser or run the Python script again.
+There can be a certain delay before newly created agents are visible in the Foundry Portal. If you don't see the agent after 10 minutes, try refreshing the browser or run the Python script again.
 </details>
-</details>
-<summary>Problem: `PermissionDenied` denied when running agent creation Python scripts</summary>
 
+<details>
+<summary>Problem: `PermissionDenied` denied when running agent creation Python scripts</summary>
+Make sure you have assigned yourself the AI Developer role on the Foundry Project.
 </details>
 
 
 ## 🧠 Conclusion and reflection
 
-[TODO: add description about what we have done]
 
 🎉 Congratulations! You've successfully built two agents and equipped them with enterprise tools to perform their tasks.
 
-If you want to expand your knowledge on what we-ve covered in this challenge, have a look at the content below:
+Let’s quickly recap what we did.
 
-- [TODO: add MCP and Foundry links]
+In [Task 1](#task-1-create-and-test-initial-anomaly-classification-agent) we created the **Anomaly Classification Agent** using a Python script.
+![task 1](./images/challenge-1-task-1.png)
 
-**Next step:** [Challenge 2](../challenge-2/challenge-2.md) - Building the Repair Planner Agent with GitHub Copilot
+The agent had a system prompt with instructions how to behave and had two _local_ tools to be able to query Cosmos DB data. When running the Python script the tools executed locally in the Python process. If you were to ask the same questions in the Foundry Portal playground the agent wouldn't be able to answer since the tools are not available there.
+
+The agent had a system prompt with instructions on how to behave and had two _local_ tools to query Cosmos DB data. When you ran the Python script, the tools executed locally in the Python process. If you ask the same questions in the Foundry Portal playground, the agent would not be able to answer because the tools are not available there.
+
+In [Task 2](#task-2-equip-the-agent-with-mcp-tools), we published the APIs as MCP servers in **API Management** and connected them to the Foundry project.
+
+![task 2](./images/challenge-1-task-2.png)
+The **Anomaly Classification Agent** could then run fully in Agent Service and hence the questions asked in the Foundry Playground worked. 
+
+The **Anomaly Classification Agent** could then run fully in Agent Service, so the questions asked in the Foundry Playground worked.
+
+The **Anomaly Classification Agent** could therefore use them as _remote_ tools over MCP
+
+Finally, in [Task 3](#task-3-understand-root-cause-with-fault-diagnosis-agent-and-foundry-iq) we created the **Fault Diagnosis Agent** and grounded with data via **AI Search** exposed as an MCP server.
+![Task 3](./images/challenge-1-task-3.png)
+
+This agent also runs fully in Agent Service and can use the tools when answering questions in the playground. Note that the content from Blob Storage isn’t fetched on demand — instead, it’s indexed ahead of time, and retrieval queries are executed against AI Search.
+
+If you want to expand your knowledge on what we’ve covered in this challenge, have a look at the content below:
+
+- [Create a knowledge base in Azure AI Search](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-create-knowledge-base?tabs=rbac&pivots=python)
+- [What is a knowledge source?](https://learn.microsoft.com/en-us/azure/search/agentic-knowledge-source-overview)
+- [Connect to Model Context Protocol servers](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/model-context-protocol?view=foundry&pivots=python)
+- [Connect a Foundry IQ knowledge base to Foundry Agent Service](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/tools/knowledge-retrieval?view=foundry&tabs=foundry%2Cpython)
+
+**Next step:** [Challenge 2](../challenge-2/README.md) - Building the Repair Planner Agent with GitHub Copilot
