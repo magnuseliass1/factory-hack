@@ -9,6 +9,8 @@ In this challenge, we will build two specialized agents for classifying and unde
 
 ## 🎯 Objective
 
+The goals for this challenge are:
+
 - Create two Foundry Agents in Python
 - Use MCP servers for remote tool invocation
 - Learn how Foundry IQ can be used to ground agents with your own data
@@ -264,6 +266,7 @@ Make sure you have assigned yourself the AI Developer role on the Foundry Projec
 Let’s quickly recap what we did.
 
 In [Task 1](#task-1-create-and-test-initial-anomaly-classification-agent) we created the **Anomaly Classification Agent** using a Python script.
+
 ![task 1](./images/challenge-1-task-1.png)
 
 The agent had a system prompt with instructions how to behave and had two _local_ tools to be able to query Cosmos DB data. When running the Python script the tools executed locally in the Python process. If you were to ask the same questions in the Foundry Portal playground the agent wouldn't be able to answer since the tools are not available there.
@@ -280,6 +283,7 @@ The **Anomaly Classification Agent** could then run fully in Agent Service, so t
 The **Anomaly Classification Agent** could therefore use them as _remote_ tools over MCP
 
 Finally, in [Task 3](#task-3-understand-root-cause-with-fault-diagnosis-agent-and-foundry-iq) we created the **Fault Diagnosis Agent** and grounded with data via **AI Search** exposed as an MCP server.
+
 ![Task 3](./images/challenge-1-task-3.png)
 
 This agent also runs fully in Agent Service and can use the tools when answering questions in the playground. Note that the content from Blob Storage isn’t fetched on demand — instead, it’s indexed ahead of time, and retrieval queries are executed against AI Search.
