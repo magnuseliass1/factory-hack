@@ -12,7 +12,7 @@ export function AlarmForm(props: {
   const machineIdInputId = useId()
   const telemetryInputId = useId()
 
-  const [machineId, setMachineId] = useState('MX-1007')
+  const [machineId, setMachineId] = useState('machine-001')
   const [telemetryText, setTelemetryText] = useState(
     JSON.stringify(
       [
@@ -66,7 +66,7 @@ export function AlarmForm(props: {
     >
       <div className="section-header">
         <div>
-          <h2 className="section-title">Define an alarm</h2>
+          <h2 className="section-title">Define an anomaly</h2>
           <p className="muted">
             Posts JSON to <span className="inline-code">/api/analyze_machine</span>.
           </p>
@@ -99,7 +99,7 @@ export function AlarmForm(props: {
             type="text"
             value={machineId}
             onChange={(e) => setMachineId(e.target.value)}
-            placeholder="e.g., MX-1007"
+            placeholder="e.g., machine-001"
             disabled={props.disabled}
             required
           />
