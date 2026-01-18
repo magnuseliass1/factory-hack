@@ -71,7 +71,16 @@ Grounding rules (IMPORTANT):
                         project_connection_id="machine-data-connection"
                     ),
 
-                    # TODO: add Foundry IQ MCP tool
+                    # MCP tool for knowledge base - NOTE: removed allowed_tools array 
+                    # due to OpenAI SDK bug in McpToolFilter.DeserializeMcpToolFilter
+                    # that can't handle arrays in allowed_tools field
+                    MCPTool(
+                        server_label="machine-wiki",
+                        server_url=machine_wiki_mcp_endpoint,
+                        require_approval="never",
+                        project_connection_id="machine-wiki-connection",
+                        # allowed_tools=["knowledge_base_retrieve"],  # Removed - causes SDK deserialization bug
+                    )
 
                 ]
 

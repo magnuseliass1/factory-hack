@@ -118,24 +118,29 @@ static async Task<IResult> AnalyzeMachine(
 
     try
     {
+        // Get Azure AI Foundry agents (v2 Prompt Agents)
         AIAgent anomalyClassificationAgent = projectClient.GetAIAgent("AnomalyClassificationAgent");
         AIAgent faultDiagnosisAgent = projectClient.GetAIAgent("FaultDiagnosisAgent");
 
-        Console.WriteLine($"Agent retrieved (name: {faultDiagnosisAgent.Name}, id: {faultDiagnosisAgent.Id})");
-        Console.WriteLine($"Agent retrieved (name: {anomalyClassificationAgent.Name}, id: {anomalyClassificationAgent.Id})");
+        Console.WriteLine($"Agent retrieved: {anomalyClassificationAgent.Name}");
+        Console.WriteLine($"Agent retrieved: {faultDiagnosisAgent.Name}");
         
         var telemetryJson = JsonSerializer.Serialize(request);
         Console.WriteLine($"Telemetry JSON: {telemetryJson}");
 
-            // Create RepairPlanner agent with Cosmos DB tools
+        // Create RepairPlanner agent with Cosmos DB tools (local agent using AOAI directly)
         var aoaiEndpoint = config["AZURE_OPENAI_ENDPOINT"];
         var aoaiDeployment = config["AZURE_OPENAI_DEPLOYMENT_NAME"] ?? "gpt-4o";
         var cosmosEndpoint = config["COSMOS_ENDPOINT"];
         var cosmosKey = config["COSMOS_KEY"];
         var cosmosDatabase = config["COSMOS_DATABASE"] ?? "FactoryOpsDB";
-        
 
-        // Create list of agents for the workflow
+        // Create list of agents for the workflow (sequential order)
+        // 1. AnomalyClassificationAgent - classifies severity (Azure AI Foundry)
+        // 2. FaultDiagnosisAgent - diagnoses root causes (Azure AI Foundry)
+        // 3. RepairPlannerAgent - creates repair plan + work order (local AOAI)
+        // 4. MaintenanceSchedulerAgent - schedules maintenance window (A2A Python)
+        // 5. PartsOrderingAgent - orders required parts (A2A Python)
         var agents = new List<AIAgent> { anomalyClassificationAgent, faultDiagnosisAgent };
 
          if (!string.IsNullOrEmpty(aoaiEndpoint))
@@ -155,7 +160,6 @@ static async Task<IResult> AnalyzeMachine(
                 var repairPlannerAgent = RepairPlannerAgentFactory.Create(
                     aoaiEndpoint, aoaiDeployment, cosmosService, loggerFactory);
                 
-                // Insert after FaultDiagnosis (position 2, index 2)
                 agents.Add(repairPlannerAgent);
                 Console.WriteLine($"RepairPlannerAgent created at {aoaiEndpoint}");
             }
@@ -169,153 +173,142 @@ static async Task<IResult> AnalyzeMachine(
             logger.LogWarning("AZURE_OPENAI_ENDPOINT not configured - RepairPlannerAgent will be skipped");
         }
 
-        // Add A2A agents from Python app if URLs are configured
+        // Add A2A agents from Python app (MaintenanceScheduler and PartsOrdering use local tools)
         var maintenanceSchedulerUrl = config["MAINTENANCE_SCHEDULER_AGENT_URL"];
+        Console.WriteLine($"MAINTENANCE_SCHEDULER_AGENT_URL = '{maintenanceSchedulerUrl ?? "(not set)"}'");
         if (!string.IsNullOrEmpty(maintenanceSchedulerUrl))
         {
-            var cardResolver = new A2ACardResolver(new Uri(maintenanceSchedulerUrl + "/"));
-            var maintenanceSchedulerAgent = await cardResolver.GetAIAgentAsync();
-            agents.Add(maintenanceSchedulerAgent);
-            Console.WriteLine($"A2A Agent added: {maintenanceSchedulerAgent.Name} at {maintenanceSchedulerUrl}");
+            try
+            {
+                var cardResolver = new A2ACardResolver(new Uri(maintenanceSchedulerUrl + "/"));
+                var maintenanceSchedulerAgent = await cardResolver.GetAIAgentAsync();
+                agents.Add(maintenanceSchedulerAgent);
+                Console.WriteLine($"A2A Agent added: {maintenanceSchedulerAgent.Name} at {maintenanceSchedulerUrl}");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to resolve MaintenanceSchedulerAgent A2A at {Url}", maintenanceSchedulerUrl);
+                Console.WriteLine($"ERROR: Failed to resolve MaintenanceSchedulerAgent: {ex.Message}");
+            }
+        }
+        else
+        {
+            logger.LogWarning("MAINTENANCE_SCHEDULER_AGENT_URL not configured - MaintenanceSchedulerAgent will be skipped");
         }
 
         var partsOrderingUrl = config["PARTS_ORDERING_AGENT_URL"];
+        Console.WriteLine($"PARTS_ORDERING_AGENT_URL = '{partsOrderingUrl ?? "(not set)"}'");
         if (!string.IsNullOrEmpty(partsOrderingUrl))
         {
-            var cardResolver = new A2ACardResolver(new Uri(partsOrderingUrl + "/"));
-            var partsOrderingAgent = await cardResolver.GetAIAgentAsync();
-            agents.Add(partsOrderingAgent);
-            Console.WriteLine($"A2A Agent added: {partsOrderingAgent.Name} at {partsOrderingUrl}");
+            try
+            {
+                var cardResolver = new A2ACardResolver(new Uri(partsOrderingUrl + "/"));
+                var partsOrderingAgent = await cardResolver.GetAIAgentAsync();
+                agents.Add(partsOrderingAgent);
+                Console.WriteLine($"A2A Agent added: {partsOrderingAgent.Name} at {partsOrderingUrl}");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to resolve PartsOrderingAgent A2A at {Url}", partsOrderingUrl);
+                Console.WriteLine($"ERROR: Failed to resolve PartsOrderingAgent: {ex.Message}");
+            }
+        }
+        else
+        {
+            logger.LogWarning("PARTS_ORDERING_AGENT_URL not configured - PartsOrderingAgent will be skipped");
         }
 
-    
-       
+        Console.WriteLine($"Total agents in workflow: {agents.Count} - [{string.Join(", ", agents.Select(a => a.Name))}]");
 
-        var workflow = AgentWorkflowBuilder.BuildSequential(agents.ToArray());
+        // WORKAROUND: AgentWorkflowBuilder.BuildSequential has MCP tool deserialization bug
+        // when passing conversation history between agents. We manually orchestrate sequential
+        // execution, passing only TEXT output (not full ChatMessage with MCP tool info).
         var workflowResult = new WorkflowResponse();
-        string? currentAgentName = null;
-        AgentStepResult? currentAgentStep = null;
-
-        var run = await InProcessExecution.RunAsync(workflow, telemetryJson);
-
-        foreach (var evt in run.NewEvents)
+        var currentInput = telemetryJson;
+        
+        foreach (var agent in agents)
         {
-            // Track when an executor (agent) starts
-            if (evt is ExecutorInvokedEvent executorInvoked)
-            {
-                // Save previous agent step if exists
-                if (currentAgentStep != null)
-                {
-                    workflowResult.AgentSteps.Add(currentAgentStep);
-                }
-                currentAgentName = executorInvoked.ExecutorId ?? "UnknownAgent";
-                currentAgentStep = new AgentStepResult { AgentName = currentAgentName };
-                logger.LogInformation("Agent started: {AgentName}", currentAgentName);
-            }
-            else if (evt is ExecutorCompletedEvent executorCompleted)
-            {
-                if (currentAgentStep != null)
-                {
-                    // Capture final message from this agent if available
-                    currentAgentStep.FinalMessage = executorCompleted.Data?.ToString();
-                }
-                logger.LogInformation("Agent completed: {AgentName}", currentAgentName);
-            }
-            else if (evt is AgentRunUpdateEvent e)
-            {
-                if (e.Update.Contents.OfType<FunctionCallContent>().FirstOrDefault() is FunctionCallContent call)
-                {
-                    var toolCall = new ToolCallInfo
-                    {
-                        ToolName = call.Name,
-                        Arguments = call.Arguments != null 
-                            ? JsonSerializer.Serialize(call.Arguments) 
-                            : null
-                    };
-                    currentAgentStep?.ToolCalls.Add(toolCall);
-                    logger.LogInformation(
-                        "Calling function '{CallName}' with arguments: {Args}",
-                        call.Name,
-                        toolCall.Arguments);
-                }
-                else if (e.Update.Contents.OfType<FunctionResultContent>().FirstOrDefault() is FunctionResultContent funcResult)
-                {
-                    // Match result to the last tool call for this agent
-                    var lastToolCall = currentAgentStep?.ToolCalls.LastOrDefault();
-                    if (lastToolCall != null)
-                    {
-                        lastToolCall.Result = funcResult.Result?.ToString();
-                    }
-                    logger.LogInformation("Function result received for {ToolName}", lastToolCall?.ToolName);
-                }
-#pragma warning disable MEAI001 // Evaluation-only API; suppress to allow compilation.
-                else if (e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolCallContent>().FirstOrDefault() is McpServerToolCallContent mcpCall)
-                {
-                    var toolCall = new ToolCallInfo
-                    {
-                        ToolName = mcpCall.ToolName,
-                        Arguments = mcpCall.Arguments != null 
-                            ? JsonSerializer.Serialize(mcpCall.Arguments) 
-                            : null
-                    };
-                    currentAgentStep?.ToolCalls.Add(toolCall);
-                    logger.LogInformation(
-                        "Calling MCP function '{CallName}' with arguments: {Args}",
-                        mcpCall.ToolName,
-                        toolCall.Arguments);
-                }
-                else if(e.Update.Contents.OfType<Microsoft.Extensions.AI.McpServerToolResultContent>().FirstOrDefault() is McpServerToolResultContent mcpCallResult)
-                {
-                    var lastToolCall = currentAgentStep?.ToolCalls.LastOrDefault();
-                    if (lastToolCall != null)
-                    {
-                        lastToolCall.Result = mcpCallResult.Output?.ToString();
-                    }
-                    logger.LogInformation(
-                        "MCP Function result: {Message}",
-                        mcpCallResult.Output);
-                }
-#pragma warning restore MEAI001
-                // Capture text content updates - concatenate streamed tokens
-                else if (e.Update.Contents.OfType<TextContent>().FirstOrDefault() is TextContent textContent)
-                {
-                    if (currentAgentStep != null && textContent.Text != null)
-                    {
-                        currentAgentStep.TextOutput += textContent.Text;
-                    }
-                }
-            }
+            Console.WriteLine($"Running agent: {agent.Name} with input: {currentInput.Substring(0, Math.Min(200, currentInput.Length))}...");
+            var agentStep = new AgentStepResult { AgentName = agent.Name };
             
-            else if (evt is WorkflowOutputEvent output)
+            try
             {
-                // Save the last agent step
-                if (currentAgentStep != null)
+                // Create fresh conversation with only the current input (TEXT only - no MCP history)
+                var messages = new List<ChatMessage> { new ChatMessage(ChatRole.User, currentInput) };
+                
+                // Run the agent
+                var response = await agent.RunAsync(messages, null);
+                
+                // Extract text output and tool calls from response
+                string? outputText = null;
+                if (response.Messages != null)
                 {
-                    workflowResult.AgentSteps.Add(currentAgentStep);
-                    currentAgentStep = null;
-                }
-
-                foreach (var msg in evt.Data as List<Microsoft.Extensions.AI.ChatMessage> ?? new List<Microsoft.Extensions.AI.ChatMessage>())
-                {
-                    if (msg.Role == ChatRole.Assistant)
+                    foreach (var msg in response.Messages)
                     {
-                        foreach (Microsoft.Extensions.AI.AIContent content in msg.Contents)
+                        // Capture tool calls from assistant messages
+                        if (msg.Role == ChatRole.Assistant)
                         {
-                            if (content is TextContent tc && !string.IsNullOrWhiteSpace(tc.Text))
+                            foreach (var content in msg.Contents)
                             {
-                                workflowResult.FinalMessage = tc.Text;
+                                if (content is TextContent tc && !string.IsNullOrWhiteSpace(tc.Text))
+                                {
+                                    outputText = tc.Text;
+                                    agentStep.TextOutput += tc.Text;
+                                }
+                                else if (content is FunctionCallContent fcc)
+                                {
+                                    agentStep.ToolCalls.Add(new ToolCallInfo
+                                    {
+                                        ToolName = fcc.Name,
+                                        CallId = fcc.CallId,
+                                        Arguments = fcc.Arguments?.ToString()
+                                    });
+                                    Console.WriteLine($"  Tool call: {fcc.Name}({fcc.Arguments})");
+                                }
+                            }
+                        }
+                        // Capture tool results
+                        else if (msg.Role == ChatRole.Tool)
+                        {
+                            foreach (var content in msg.Contents)
+                            {
+                                if (content is FunctionResultContent frc)
+                                {
+                                    // Find matching tool call by CallId and add result
+                                    var matchingCall = agentStep.ToolCalls.LastOrDefault(t => t.CallId == frc.CallId);
+                                    if (matchingCall != null)
+                                    {
+                                        matchingCall.Result = frc.Result?.ToString()?.Substring(0, Math.Min(500, frc.Result?.ToString()?.Length ?? 0));
+                                    }
+                                    Console.WriteLine($"  Tool result: {frc.CallId} -> {frc.Result?.ToString()?.Substring(0, Math.Min(100, frc.Result?.ToString()?.Length ?? 0))}...");
+                                }
                             }
                         }
                     }
                 }
+                
+                agentStep.FinalMessage = outputText;
+                Console.WriteLine($"Agent {agent.Name} completed with {agentStep.ToolCalls.Count} tool calls. Output: {outputText?.Substring(0, Math.Min(200, outputText?.Length ?? 0))}...");
+                
+                // Pass output to next agent as input (TEXT only - avoids MCP deserialization bug)
+                if (!string.IsNullOrEmpty(outputText))
+                {
+                    currentInput = outputText;
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Agent {agent.Name} failed: {ex.Message}");
+                Console.WriteLine($"  Stack trace: {ex.StackTrace}");
+                agentStep.FinalMessage = $"Error: {ex.Message}";
+                agentStep.TextOutput = $"Error: {ex.Message}\n\nInput was: {currentInput.Substring(0, Math.Min(500, currentInput.Length))}...";
+            }
+            
+            workflowResult.AgentSteps.Add(agentStep);
         }
-
-        // If there's still an unsaved agent step, add it
-        if (currentAgentStep != null)
-        {
-            workflowResult.AgentSteps.Add(currentAgentStep);
-        }
+        
+        // Set final message from last agent
+        workflowResult.FinalMessage = workflowResult.AgentSteps.LastOrDefault()?.FinalMessage;
 
         return Results.Ok(workflowResult);
     }
@@ -405,6 +398,7 @@ public class AgentStepResult
 public class ToolCallInfo
 {
     public string ToolName { get; set; } = string.Empty;
+    public string? CallId { get; set; }
     public string? Arguments { get; set; }
     public string? Result { get; set; }
 }
