@@ -250,7 +250,10 @@ export $(cat ../.env | xargs)
 
 ### Task 7: Assign additional permissions
 
-To perform certain tasks in the hackathon, you need additional permissions—specifically the `Azure AI Developer` role on the Foundry project resource.
+To perform certain tasks in the hackathon, you need additional permissions:
+
+- `Azure AI Developer` on the **Foundry project** resource (agent/project operations)
+- `Cognitive Services OpenAI Contributor` on the **Azure OpenAI** resource (calling chat completions)
 
 ```bash
 # Get your Entra ID (AAD) user object ID
@@ -262,6 +265,16 @@ az role assignment create \
   --assignee-principal-type User \
   --role "Azure AI Developer" \
   --scope "$AZURE_AI_PROJECT_RESOURCE_ID"
+
+# Assign "Cognitive Services OpenAI Contributor" at the Azure OpenAI resource scope
+# This is required for data-plane calls like: /openai/deployments/{deployment}/chat/completions
+OPENAI_RESOURCE_ID="$(az cognitiveservices account show --name "$AZURE_OPENAI_SERVICE_NAME" --resource-group "$RESOURCE_GROUP" --query id -o tsv)"
+
+az role assignment create \
+  --assignee-object-id "$ME_OBJECT_ID" \
+  --assignee-principal-type User \
+  --role "Cognitive Services OpenAI Contributor" \
+  --scope "$OPENAI_RESOURCE_ID"
 
 # Refresh your credentials with the new permissions
 az login --use-device-code

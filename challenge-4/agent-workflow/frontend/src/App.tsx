@@ -216,7 +216,7 @@ function App() {
         </a>
         <h1 className="app-title">Factory Agent Workflow</h1>
         <p className="app-subtitle">
-          Define an alarm, then watch agents process it (mocked).
+          Define an alert, then watch agents process it.
         </p>
       </header>
 
