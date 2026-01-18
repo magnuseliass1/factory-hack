@@ -22,7 +22,6 @@ First, we’ll develop an **Anomaly Classification Agent** to interpret detected
 
 You will use the Azure resources highlighted in the image below.
 ![Challenge 1 Azure Resources](./images/challenge-1-azure-resources.png)
-The following drawing illustrates the part of the architecture we will implement in this challenge.
 
 ### Model Context Protocol (MCP)
 
