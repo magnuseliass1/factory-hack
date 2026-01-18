@@ -411,7 +411,7 @@ Make sure you call `EnsureAgentVersionAsync()` before `PlanAndCreateWorkOrderAsy
 
 ---
 
-## 🧠 Conclusion
+## 🧠 Conclusion and reflection
 
 🎉 Congratulations! You've built a Repair Planner Agent in .NET using GitHub Copilot.
 
