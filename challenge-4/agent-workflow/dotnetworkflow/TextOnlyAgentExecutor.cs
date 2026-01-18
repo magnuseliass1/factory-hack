@@ -106,14 +106,3 @@ public sealed class TextOnlyAgentExecutor : Executor<string, string>
         return agentStep.FinalMessage ?? "";
     }
 }
-
-/// <summary>
-/// Represents a tool/function call made by an agent
-/// </summary>
-public class ToolCallInfo
-{
-    public string ToolName { get; set; } = string.Empty;
-    public string? CallId { get; set; }
-    public string? Arguments { get; set; }
-    public string? Result { get; set; }
-}

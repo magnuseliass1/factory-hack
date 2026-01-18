@@ -224,8 +224,7 @@ Currently only one tool `machine_data` is available. Your task is to add the kno
         server_label="machine-wiki",
         server_url=machine_wiki_mcp_endpoint,
         require_approval="never",
-        project_connection_id="machine-wiki-connection",
-        allowed_tools=["knowledge_base_retrieve"],
+        project_connection_id="machine-wiki-connection"
     )
     ```
 
