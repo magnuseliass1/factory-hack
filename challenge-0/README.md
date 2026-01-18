@@ -14,7 +14,7 @@ If something isn’t working as expected, please let your coach know.
 
 ## 🎯 Objective
 
-The goals for this challenge are
+The goals for this challenge are:
 
 1. Provision the Azure resources needed for the upcoming challenges.
 2. Seed sample data for the tire factory predictive maintenance multi-agent system.
