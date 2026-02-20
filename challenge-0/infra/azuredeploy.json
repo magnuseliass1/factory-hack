@@ -369,7 +369,7 @@
     {
       "type": "Microsoft.CognitiveServices/accounts/deployments",
       "apiVersion": "2025-04-01-preview",
-      "name": "[format('{0}/{1}', variables('aiFoundryName'), 'gpt-5-mini')]",
+      "name": "[format('{0}/{1}', variables('aiFoundryName'), 'gpt-5.1')]",
       "sku": {
         "capacity": 50,
         "name": "GlobalStandard"
@@ -403,7 +403,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.CognitiveServices/accounts', variables('aiFoundryName'))]",
-        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', variables('aiFoundryName'), 'gpt-5-mini')]"
+        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', variables('aiFoundryName'), 'gpt-5.1')]"
       ]
     },
     {
