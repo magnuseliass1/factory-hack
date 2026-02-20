@@ -359,7 +359,7 @@
         "model": {
           "name": "gpt-5-mini",
           "format": "OpenAI",
-          "version": "2024-07-18"
+          "version": "2025-08-07"
         }
       },
       "dependsOn": [
@@ -369,7 +369,7 @@
     {
       "type": "Microsoft.CognitiveServices/accounts/deployments",
       "apiVersion": "2025-04-01-preview",
-      "name": "[format('{0}/{1}', variables('aiFoundryName'), 'gpt-4.1')]",
+      "name": "[format('{0}/{1}', variables('aiFoundryName'), 'gpt-5-mini')]",
       "sku": {
         "capacity": 50,
         "name": "GlobalStandard"
@@ -378,7 +378,7 @@
         "model": {
           "name": "gpt-5-mini",
           "format": "OpenAI",
-          "version": "2024-07-18"
+          "version": "2025-08-07"
         }
       },
       "dependsOn": [
@@ -403,7 +403,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.CognitiveServices/accounts', variables('aiFoundryName'))]",
-        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', variables('aiFoundryName'), 'gpt-4.1')]"
+        "[resourceId('Microsoft.CognitiveServices/accounts/deployments', variables('aiFoundryName'), 'gpt-5-mini')]"
       ]
     },
     {
