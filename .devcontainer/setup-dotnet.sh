@@ -15,8 +15,8 @@ echo "📥 Installing required NuGet packages..."
 
 # Azure SDKs
 dotnet add package Microsoft.Azure.Cosmos
-dotnet add package Azure.AI.Inference --version 1.0.0-beta.5 --prerelease
-dotnet add package Azure.AI.Projects --version 1.1.0
+dotnet add package Azure.AI.Inference --version 1.0.0-beta.4
+dotnet add package Azure.AI.Projects --version 1.2.0-beta.5
 dotnet add package Azure.Identity
 
 # Configuration
