@@ -227,6 +227,9 @@ After deploying resources, configure environment variables in the `.env` file. E
 > Otherwise, the environment variables may not be extracted correctly.
 
 ```bash
+# If you are not already in challenge-0, switch to it first
+cd challenge-0
+
 # Extract connection keys
 ./get-keys.sh --resource-group $RESOURCE_GROUP
 
