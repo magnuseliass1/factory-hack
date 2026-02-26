@@ -7,6 +7,12 @@ In this challenge, you'll work with two specialized AI agents that optimize fact
 **Expected Duration:** 60 minutes
 **Prerequisites**: [Challenge 0](../challenge-0/challenge-0.md) successfully completed
 
+> [!TIP]
+> If you hit `PermissionDenied`, auth errors, or missing environment variables:
+> - Run `az login --use-device-code`
+> - Re-load env vars with `export $(cat ../.env | xargs)`
+> - If roles were just assigned, wait 5-10 minutes and run both commands again
+
 ## 🎯 Objective
 
 The goals for this challenge are:

@@ -7,6 +7,12 @@ In this challenge, we will build two specialized agents for classifying and unde
 **Expected duration**: 60 min
 **Prerequisites**: [Challenge 0](../challenge-0/README.md) successfully completed
 
+> [!TIP]
+> If a command fails with `PermissionDenied`, missing env vars, or auth errors:
+> - Run `az login --use-device-code`
+> - Re-load env vars with `export $(cat ../.env | xargs)`
+> - If roles were just assigned, wait 5-10 minutes and run both commands again
+
 ## 🎯 Objective
 
 The goals for this challenge are:
@@ -69,6 +75,8 @@ A few things to observe:
 
 ```bash
 cd challenge-1
+# If dependencies are missing or outdated, run:
+pip install --pre -r ../requirements.txt
 python agents/anomaly_classification_agent.py
 
 ```

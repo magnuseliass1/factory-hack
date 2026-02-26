@@ -12,6 +12,11 @@ If something isn’t working as expected, please let your coach know.
 - **GitHub Codespaces** access
 - **Azure CLI** (pre-installed in Codespaces)
 
+> [!TIP]
+> **Session quick rules**
+> - Run `export $(cat ../.env | xargs)` whenever you open a new terminal, resume a stopped Codespace, or update `.env`.
+> - Run `az login --use-device-code` again if your token expires or after role changes (for example after Task 7).
+
 ## 🎯 Objective
 
 The goals for this challenge are:

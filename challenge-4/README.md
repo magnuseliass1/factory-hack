@@ -9,6 +9,12 @@ In this challenge, you’ll run a complete **agent framework workflow** that tie
 - [Challenge 0](../challenge-0/README.md) successfully completed 
 - [Challenge 1](../challenge-1/README.md) successfully completed 
 
+> [!TIP]
+> If you hit `401`, `PermissionDenied`, auth errors, or missing environment variables:
+> - Run `az login --use-device-code`
+> - Re-load environment variables from the `.env` file used for Challenge 4
+> - If roles were just assigned, wait 5-10 minutes and run both steps again
+
 ## 🎯 Objective
 
 The goals for this challenge are:

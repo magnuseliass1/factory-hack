@@ -15,6 +15,8 @@ azure-monitor-opentelemetry>=1.2.0
 opentelemetry-api>=1.20.0
 opentelemetry-sdk>=1.20.0
 opentelemetry-exporter-otlp-proto-grpc>=1.20.0
+# Keep this pinned for compatibility with current agent-framework beta used in Challenge 1.
+opentelemetry-semantic-conventions-ai==0.4.13
 
 # Data handling
 dataclasses-json>=0.6.0
