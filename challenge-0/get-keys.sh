@@ -266,6 +266,12 @@ if [ -z "$storageAccountName" ] || [ -z "$aiFoundryProjectName" ]; then
     fi
 fi
 
+# Normalize project name if it is returned as a path (e.g. "<hub>/<project>")
+if [ -n "$aiFoundryProjectName" ] && [[ "$aiFoundryProjectName" == */* ]]; then
+    aiFoundryProjectName="${aiFoundryProjectName##*/}"
+    echo "Normalized AI project name: $aiFoundryProjectName"
+fi
+
 # Construct Azure AI Search connection ID directly
 if [ -n "$aiFoundryHubName" ] && [ -n "$searchServiceName" ]; then
     echo "Constructing Azure AI Search connection ID..."
@@ -293,6 +299,17 @@ else
     azureAIConnectionId=""
 fi
 
+# Normalize endpoint if it contains an extra hub segment (e.g. /api/projects/<hub>/<project>)
+if [ -n "$aiFoundryProjectEndpoint" ] && [[ "$aiFoundryProjectEndpoint" == *"/api/projects/"* ]]; then
+    endpointBase="${aiFoundryProjectEndpoint%%/api/projects/*}"
+    endpointProjectPath="${aiFoundryProjectEndpoint##*/api/projects/}"
+    if [[ "$endpointProjectPath" == */* ]]; then
+        endpointProjectPath="${endpointProjectPath##*/}"
+    fi
+    aiFoundryProjectEndpoint="${endpointBase}/api/projects/${endpointProjectPath}"
+    echo "Normalized AI Foundry project endpoint: $aiFoundryProjectEndpoint"
+fi
+
 # Note: AI Foundry Project Endpoint construction is handled later in the script
 
 # Overwrite the existing .env file
@@ -305,6 +322,12 @@ echo "Storing the keys and properties in '.env' file..."
 
 # Get subscription ID
 subscriptionId=$(az account show --query id -o tsv 2>/dev/null || echo "")
+
+# Ensure project resource ID is always in the canonical format:
+# /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<hub>/projects/<project>
+if [ -n "$subscriptionId" ] && [ -n "$resourceGroupName" ] && [ -n "$aiFoundryHubName" ] && [ -n "$aiFoundryProjectName" ]; then
+    azureAIProjectResourceId="/subscriptions/${subscriptionId}/resourceGroups/${resourceGroupName}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryHubName}/projects/${aiFoundryProjectName}"
+fi
 
 # Azure resource group and subscription
 echo "RESOURCE_GROUP=\"$resourceGroupName\"" >> "$ENV_OUT"
