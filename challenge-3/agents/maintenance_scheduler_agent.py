@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from agent_framework.azure import AzureAIClient
@@ -45,6 +45,17 @@ class MaintenanceSchedulerAgent:
         self.project_endpoint = project_endpoint
         self.deployment_name = deployment_name
         self.cosmos_service = cosmos_service
+
+    def _safe_parse_datetime(self, value, fallback: datetime) -> datetime:
+        """Parse ISO datetime safely and fall back when model output is invalid."""
+        if not value:
+            return fallback
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except Exception:
+            print(
+                f"   Warning: Invalid datetime '{value}' from model response. Using fallback.")
+            return fallback
 
     async def predict_schedule(
         self,
@@ -98,25 +109,49 @@ Always respond in valid JSON format as requested."""
         json_response = self._extract_json(response_text)
         data = json.loads(json_response)
 
+        fallback_window = windows[0] if windows else MaintenanceWindow(
+            id="fallback-window",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow() + timedelta(hours=2),
+            production_impact="Unknown",
+            is_available=True,
+        )
+
+        window_data = data.get("maintenanceWindow", {})
+        if not isinstance(window_data, dict):
+            window_data = {}
+
+        window_start = self._safe_parse_datetime(
+            window_data.get("startTime"), fallback_window.start_time or datetime.utcnow())
+        window_end = self._safe_parse_datetime(
+            window_data.get("endTime"), fallback_window.end_time or (window_start + timedelta(hours=2)))
+
+        # Keep a sane window even if model returns invalid temporal ordering.
+        if window_end <= window_start:
+            window_end = window_start + timedelta(hours=2)
+
+        scheduled_date = self._safe_parse_datetime(
+            data.get("scheduledDate"), window_start)
+
         return MaintenanceSchedule(
             id=f"sched-{datetime.utcnow().timestamp()}",
             work_order_id=work_order.id,
             machine_id=work_order.machine_id,
-            scheduled_date=datetime.fromisoformat(
-                data["scheduledDate"].replace("Z", "+00:00")),
+            scheduled_date=scheduled_date,
             maintenance_window=MaintenanceWindow(
-                id=data["maintenanceWindow"]["id"],
-                start_time=datetime.fromisoformat(
-                    data["maintenanceWindow"]["startTime"].replace("Z", "+00:00")),
-                end_time=datetime.fromisoformat(
-                    data["maintenanceWindow"]["endTime"].replace("Z", "+00:00")),
-                production_impact=data["maintenanceWindow"]["productionImpact"],
-                is_available=data["maintenanceWindow"]["isAvailable"],
+                id=window_data.get("id", fallback_window.id),
+                start_time=window_start,
+                end_time=window_end,
+                production_impact=window_data.get(
+                    "productionImpact", fallback_window.production_impact),
+                is_available=window_data.get(
+                    "isAvailable", fallback_window.is_available),
             ),
-            risk_score=data["riskScore"],
-            predicted_failure_probability=data["predictedFailureProbability"],
-            recommended_action=data["recommendedAction"],
-            reasoning=data["reasoning"],
+            risk_score=data.get("riskScore", 0),
+            predicted_failure_probability=data.get(
+                "predictedFailureProbability", 0),
+            recommended_action=data.get("recommendedAction", "SCHEDULED"),
+            reasoning=data.get("reasoning", "No reasoning provided."),
             created_at=datetime.utcnow(),
         )
 
