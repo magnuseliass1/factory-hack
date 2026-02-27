@@ -85,7 +85,7 @@ Always respond in valid JSON format as requested."""
 
         credential = DefaultAzureCredential()
 
-        async with AzureAIClient(credential).create_agent(
+        async with AzureAIClient(credential=credential).create_agent(
             endpoint=self.project_endpoint,
             model=self.deployment_name,
             name="PartsOrderingAgent",
