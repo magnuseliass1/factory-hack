@@ -81,7 +81,7 @@ python agents/anomaly_classification_agent.py
 
 ```
 
-If dependencies are missing or outdated, run and try to run the agent again:
+If dependencies are missing or outdated, run the code below and try to run the agent again:
 
 ```bash
 pip install --pre -r ../requirements.txt
