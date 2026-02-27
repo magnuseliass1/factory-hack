@@ -264,6 +264,10 @@ To perform certain tasks in the hackathon, you need additional permissions:
 - `Cognitive Services OpenAI Contributor` on the **Azure OpenAI** resource (calling chat completions)
 
 > [!NOTE]
+> Depending on the setup for the hackathon, these role assignments might already be provisioned for your user and you can then skip this step.
+> Check with your hackathon coach what is applicable for you.
+
+> [!NOTE]
 > Role assignments can take **5–10 minutes** to fully propagate. If you still see `PermissionDenied` errors after assigning roles, wait a few minutes, then run `az login --use-device-code` again and re-export your environment variables.
 
 ```bash

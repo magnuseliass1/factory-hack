@@ -73,12 +73,18 @@ A few things to observe:
 
 #### Task 1.2. Run the code
 
+Run the agent:
+
 ```bash
 cd challenge-1
-# If dependencies are missing or outdated, run:
-pip install --pre -r ../requirements.txt
 python agents/anomaly_classification_agent.py
 
+```
+
+If dependencies are missing or outdated, run:
+
+```bash
+pip install --pre -r ../requirements.txt
 ```
 
 Verify that the agent responded with a reasonable answer.
